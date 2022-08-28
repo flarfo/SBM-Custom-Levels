@@ -1,3 +1,7 @@
+<p align="center">
+    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/modicon.png" height="512" width="512">
+</p>
+
 # SBM Custom Levels
 ![Downloads](https://img.shields.io/github/downloads/flarfo/SBM-Custom-Levels/total?color=brightgreen)
 ![Release](https://img.shields.io/github/v/release/flarfo/SBM-Custom-Levels?color=brightgreen&style=plastic)
