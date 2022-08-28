@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/modicon.png" height="512" width="512">
+    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/modicon.png" height="320" width="320">
 </p>
 
 # SBM Custom Levels
