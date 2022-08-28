@@ -129,26 +129,26 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CameraController.cs" />
-    <Compile Include="EditorManager.cs" />
-    <Compile Include="EditorSelectable.cs" />
-    <Compile Include="EditorUI.cs" />
-    <Compile Include="MenuManager.cs" />
-    <Compile Include="Object Wrappers\FloatObject.cs" />
-    <Compile Include="Object Wrappers\JsonObject.cs" />
-    <Compile Include="LevelManager.cs" />
-    <Compile Include="LevelLoader_Mod.cs" />
-    <Compile Include="Outline.cs" />
-    <Compile Include="Patches.cs" />
+    <Compile Include="SBMCustomLevels\CameraController.cs" />
+    <Compile Include="SBMCustomLevels\EditorManager.cs" />
+    <Compile Include="SBMCustomLevels\EditorSelectable.cs" />
+    <Compile Include="SBMCustomLevels\EditorUI.cs" />
+    <Compile Include="SBMCustomLevels\MenuManager.cs" />
+    <Compile Include="SBMCustomLevels\Object Wrappers\FloatObject.cs" />
+    <Compile Include="SBMCustomLevels\Object Wrappers\JsonObject.cs" />
+    <Compile Include="SBMCustomLevels\LevelManager.cs" />
+    <Compile Include="SBMCustomLevels\LevelLoader_Mod.cs" />
+    <Compile Include="SBMCustomLevels\Outline.cs" />
+    <Compile Include="SBMCustomLevels\Patches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RecordLevel.cs" />
+    <Compile Include="SBMCustomLevels\RecordLevel.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="sbm-bundle" />
-    <EmbeddedResource Include="scene-bundle" />
+    <EmbeddedResource Include="SBMCustomLevels\sbm-bundle" />
+    <EmbeddedResource Include="SBMCustomLevels\scene-bundle" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="ui-bundle" />
+    <EmbeddedResource Include="SBMCustomLevels\ui-bundle" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
