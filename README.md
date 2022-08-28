@@ -1,5 +1,5 @@
 # SBM Custom Levels
-[![Discord](https://img.shields.io/github/downloads/flarfo/SBM-Custom-Levels/total?style=plastic)]()
+![Discord](https://img.shields.io/github/downloads/flarfo/SBM-Custom-Levels/total?style=plastic)
 
 
 ## About
