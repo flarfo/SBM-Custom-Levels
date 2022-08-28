@@ -1,5 +1,5 @@
 # SBM Custom Levels
-[![Discord](https://raegous.visualstudio.com/Risk%20of%20Rain%202%20Modding/_apis/build/status/Risk%20of%20Rain%202%20Modding-.NET%20Desktop-CI?branchName=master)](https://discord.gg/QkmyuTPhbC)
+[![Discord](https://img.shields.io/github/downloads/flarfo/SBM-Custom-Levels/total?style=plastic)](https://discord.gg/QkmyuTPhbC)
 
 
 ## About
