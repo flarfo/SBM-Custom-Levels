@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32616.157
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SBM_CustomLevels", "SBM_CustomLevels.csproj", "{B2AA20F6-8D12-4A5D-A28E-E92F2E2BA9F6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B2AA20F6-8D12-4A5D-A28E-E92F2E2BA9F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2AA20F6-8D12-4A5D-A28E-E92F2E2BA9F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2AA20F6-8D12-4A5D-A28E-E92F2E2BA9F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2AA20F6-8D12-4A5D-A28E-E92F2E2BA9F6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6E2A1DE0-C441-4579-A5FC-CCF295BE7DF9}
+	EndGlobalSection
+EndGlobal

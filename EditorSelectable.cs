@@ -1,0 +1,121 @@
+﻿using System;
+using UnityEngine;
+namespace SBM_CustomLevels
+{
+    public class EditorSelectable : MonoBehaviour
+    {
+        Vector3 mouseOffset;
+
+        float zCoord;
+
+        private bool selected = false;
+
+        //when selected, add enable outline and set inspector to display object transform values
+        public bool Selected
+        {
+            get { return selected; }
+
+            set 
+            {
+                selected = value;
+                outline.enabled = value;
+
+                SetInspectorInfo();
+            }
+        }
+
+        Outline outline;
+
+        //apply outline
+        void Awake()
+        {
+            outline = GetComponent<Outline>();
+
+            outline.OutlineColor = new Color32(255, 0, 203, 255);
+            outline.OutlineWidth = 6f;
+
+            outline.enabled = false;
+        }
+
+        private void OnMouseDown()
+        {
+            SetMouseOffset();
+        }
+
+        /*private void OnMouseDrag()
+        {
+            if (selected && EditorManager.instance.moveTool)
+            {
+                MoveObject();
+            }
+        }*/
+
+        public void MoveObject(Vector2 snapVector)
+        {
+            Vector3 pos = GetMouseWorldPos() + mouseOffset;
+
+            if (EditorManager.instance.snapEnabled)
+            {
+                Vector2 snappedPos = new Vector3();
+
+                if (snapVector.x == 0)
+                {
+                    snappedPos.x = gameObject.transform.position.x;
+                }
+                else
+                {
+                    snappedPos.x = Mathf.Round(pos.x / snapVector.x) * snapVector.x;
+                }
+
+                if (snapVector.y == 0)
+                {
+                    snappedPos.y = gameObject.transform.position.y;
+                }
+                else
+                {
+                    snappedPos.y = Mathf.Round(pos.y / snapVector.y) * snapVector.y;
+                }
+
+                transform.position = new Vector3(snappedPos.x, snappedPos.y, pos.z);
+            }
+            else
+            {
+                transform.position = new Vector3(pos.x, pos.y, pos.z);
+            }
+        }
+
+        public void SetMouseOffset()
+        {
+            zCoord = EditorManager.instance.editorCamera.WorldToScreenPoint(transform.position).z;
+
+            mouseOffset = gameObject.transform.position - GetMouseWorldPos();
+        }
+
+        Vector3 GetMouseWorldPos()
+        {
+            Vector3 mousePoint = Input.mousePosition;
+
+            mousePoint.z = zCoord;
+
+            return EditorManager.instance.editorCamera.ScreenToWorldPoint(mousePoint);
+        }
+
+        /// <summary>
+        /// Sets inspector UI information based on this objects transform.
+        /// </summary>
+        public void SetInspectorInfo()
+        {
+            bool multiple = false;
+
+            if (EditorManager.instance.curSelected.Count > 1)
+            {
+                multiple = true;
+            }
+
+            EditorUI.instance.SetInspectorName(gameObject.name, multiple);
+            EditorUI.instance.SetInspectorPosition(transform.position, multiple);
+            EditorUI.instance.SetInspectorRotation(transform.rotation.eulerAngles, multiple);
+            EditorUI.instance.SetInspectorScale(transform.localScale, multiple);
+        }
+    }
+}
