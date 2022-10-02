@@ -64,7 +64,9 @@ namespace SBM_CustomLevels
                     break;
                 }
 
-                worldsList.Add(new Tuple<string, List<string>>(world, Directory.GetFiles(world).ToList()));
+                List<string> levels = Directory.GetFiles(world, "*.sbm").ToList();
+
+                worldsList.Add(new Tuple<string, List<string>>(world, levels));
 
                 count++;
             }
