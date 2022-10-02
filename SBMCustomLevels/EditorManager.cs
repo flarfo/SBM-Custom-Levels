@@ -185,6 +185,17 @@ namespace SBM_CustomLevels
             }
         }
 
+        public void SetSnapX(float snapX)
+        {
+            snapVector.x = snapX;
+            
+        }
+
+        public void SetSnapY(float snapY)
+        {
+            snapVector.y = snapY;
+        }
+
         //resets editor so data doesnt carry over into new editor instances
         public void ResetEditor()
         {
@@ -251,6 +262,11 @@ namespace SBM_CustomLevels
 
             GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_2.transform.position = spawnPos_2;
+
+            //create cloud spawner (rework for specific clouds..)
+            /*SBM.Objects.Common.Cloud.CloudSpawner cloudSpawner = Instantiate(Resources.Load("prefabs/level/Cloud Spawner") as GameObject).GetComponent<SBM.Objects.Common.Cloud.CloudSpawner>();
+            cloudSpawner.CloudPrefabs.Clear();
+            cloudSpawner.CloudPrefabs.Add(Resources.Load("prefabs/level/world1/Cloud_W1") as GameObject);*/
         }
 
         //creates a new base level in editor mode
@@ -266,17 +282,13 @@ namespace SBM_CustomLevels
             GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_2.transform.position = new Vector3(0.5f, 0, 0);
 
-            SBM.Objects.Common.Cloud.CloudSpawner cloudSpawner = Instantiate(Resources.Load("prefabs/level/Cloud Spawner") as GameObject).GetComponent<SBM.Objects.Common.Cloud.CloudSpawner>();
+            /*SBM.Objects.Common.Cloud.CloudSpawner cloudSpawner = Instantiate(Resources.Load("prefabs/level/Cloud Spawner") as GameObject).GetComponent<SBM.Objects.Common.Cloud.CloudSpawner>();
             cloudSpawner.CloudPrefabs.Clear();
-            cloudSpawner.CloudPrefabs.Add(Resources.Load("prefabs/level/world1/Cloud_W1") as GameObject);
+            cloudSpawner.CloudPrefabs.Add(Resources.Load("prefabs/level/world1/Cloud_W1") as GameObject);*/
         }
 
         public void InitializeEditor()
         {
-            Camera.main.gameObject.AddComponent<CameraController>();
-
-            editorCamera = Camera.main;
-
             //create editor ui
             AssetBundle loadedBundle = LevelLoader_Mod.GetAssetBundleFromResources("ui-bundle");
 

@@ -78,7 +78,7 @@ namespace SBM_CustomLevels
                 }
             }
 
-            string filePath = Path.Combine(LevelLoader_Mod.levelsPath, "level.json");
+            string filePath = Path.Combine(LevelLoader_Mod.levelsPath, EditorManager.instance.selectedLevel);
 
             File.WriteAllLines(filePath, jsonList);
         }

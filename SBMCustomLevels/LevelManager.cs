@@ -56,10 +56,10 @@ namespace SBM_CustomLevels
                 }
             };
 
-            Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject);
-
             loadedBundle.Unload(false);
         }
+
+
 
         public void LoadLevel(bool isEditor, bool newLevel, string path)
         {
@@ -81,6 +81,16 @@ namespace SBM_CustomLevels
             else
             {
                 LoadJSONLevel(path);
+            }
+
+            Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject); //must happen AFTER carrot is loaded in, otherwise some stuff is goofed^
+
+            if (isEditor)
+            {
+                //add camera controller, (camera loaed in LevelPrefab_Story), moved from InitializeEditor as camera didnt exist previously...)
+                Camera.main.gameObject.AddComponent<CameraController>();
+
+                EditorManager.instance.editorCamera = Camera.main;
             }
         }
 

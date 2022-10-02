@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using UnityEngine;
 using SceneSystem = SBM.Shared.SceneSystem;
+using SBM;
 
 namespace SBM_CustomLevels
 {
@@ -16,7 +17,5 @@ namespace SBM_CustomLevels
                 EditorManager.instance.InEditor = false;
             }
         }
-
-        //create patch for LevelSystem.Worlds
     }
 }

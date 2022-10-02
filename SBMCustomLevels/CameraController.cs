@@ -14,6 +14,8 @@ namespace SBM_CustomLevels
         //position at which camera exists
         private float zCoord = -5.8f;
 
+        public bool freeCam = false;
+
         private void Awake()
         {
             camera = gameObject.GetComponent<Camera>();
@@ -24,6 +26,11 @@ namespace SBM_CustomLevels
         //drag to move when middle click
         private void LateUpdate()
         {   
+            if (freeCam)
+            {
+                return;
+            }
+
             if (Input.GetKeyDown(KeyCode.Mouse2))
             {
                 lastPos = transform.position/8;
@@ -43,6 +50,17 @@ namespace SBM_CustomLevels
 
                 transform.position = new Vector3(finalPos.x, finalPos.y, zCoord);                                         
             }
+
+            if (Input.GetKeyDown(KeyCode.Pause))
+            {
+                freeCam = !freeCam;
+            }
+        }
+
+        //freecam
+        private void Update()
+        {
+
         }
 
         //prevent camera from automatically following player, disrupting drag movement

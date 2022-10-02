@@ -17,6 +17,8 @@ namespace SBM_CustomLevels
         public InputField[] rotationField;
         public InputField[] scaleField;
 
+        private Text lastSavedText;
+
         private GameObject uiBarBottom;
         private bool bottomBarEnabled = false;
 
@@ -84,6 +86,46 @@ namespace SBM_CustomLevels
                 }
             });
 
+            //save button saves when clicked
+            lastSavedText = GameObject.Find("LastSavedText").GetComponent<Text>();
+            Button saveButton = GameObject.Find("SaveButton").GetComponent<Button>();
+            saveButton.onClick.AddListener(delegate
+            {
+                RecordLevel.RecordJSONLevel();
+
+                //set save timestamp
+                lastSavedText.text = "Saved: " + DateTime.Now.ToString("HH:mm");
+            });
+            
+            //enable snapping
+            Button snapEnableButton = GameObject.Find("SnapEnableButton").GetComponent<Button>();
+            snapEnableButton.onClick.AddListener(delegate
+            {
+                EditorManager.instance.snapEnabled = !EditorManager.instance.snapEnabled;
+
+                if (EditorManager.instance.snapEnabled)
+                {
+                    snapEnableButton.gameObject.GetComponent<RawImage>().color = Color.green;
+                }
+                else
+                {
+                    snapEnableButton.gameObject.GetComponent<RawImage>().color = Color.white;
+                }
+            });
+            
+            //set snap values when SnapUI text is submitted
+            InputField snapFieldX = GameObject.Find("SnapFieldX").GetComponent<InputField>();
+            snapFieldX.onSubmit.AddListener(delegate (string value)
+            {
+                EditorManager.instance.SetSnapX(float.Parse(value));
+            });
+            
+            InputField snapFieldY = GameObject.Find("SnapFieldY").GetComponent<InputField>();
+            snapFieldY.onSubmit.AddListener(delegate (string value)
+            {
+                EditorManager.instance.SetSnapY(float.Parse(value));
+            });
+            
             //adds submit events for inputfield UI in the inspector (when enter press, apply transformation to object based on text input)
             AddPositionInputEvent(positionField[0], 0);
             AddPositionInputEvent(positionField[1], 1);
@@ -170,10 +212,7 @@ namespace SBM_CustomLevels
             uiBarBottom.SetActive(false);
         }
 
-        /// <summary>
         /// When given button pressed, open respective blocks panel and disable other block panels that might be open. Disables/enables bottom UI bar.
-        /// </summary>
-        /// <param name="buttonId"></param>
         void AddWorldUIEvent(int buttonId)
         {
             worldButtons[buttonId].onClick.AddListener(delegate
@@ -211,11 +250,7 @@ namespace SBM_CustomLevels
             });
         }
 
-        /// <summary>
-        /// When InputField text is submitted, apply position transform on currently selected objects based on text.
-        /// </summary>
-        /// <param name="inputField"></param>
-        /// <param name="coordinate"></param>
+        // When InputField text is submitted, apply position transform on currently selected objects based on text.
         void AddPositionInputEvent(InputField inputField, int coordinate)
         {
             inputField.onSubmit.AddListener(delegate (string value)
@@ -230,11 +265,7 @@ namespace SBM_CustomLevels
             });
         }
 
-        /// <summary>
-        /// When InputField text is submitted, apply rotation transform on currently selected objects based on text.
-        /// </summary>
-        /// <param name="inputField"></param>
-        /// <param name="coordinate"></param>
+        // When InputField text is submitted, apply rotation transform on currently selected objects based on text.
         void AddRotationInputEvent(InputField inputField, int coordinate)
         {
             inputField.onSubmit.AddListener(delegate (string value)
@@ -249,11 +280,7 @@ namespace SBM_CustomLevels
             });
         }
 
-        /// <summary>
-        /// When InputField text is submitted, apply scale transform on currently selected objects based on text.
-        /// </summary>
-        /// <param name="inputField"></param>
-        /// <param name="coordinate"></param>
+        // When InputField text is submitted, apply scale transform on currently selected objects based on text.
         void AddScaleInputEvent(InputField inputField, int coordinate)
         {
             inputField.onSubmit.AddListener(delegate (string value)
@@ -274,11 +301,7 @@ namespace SBM_CustomLevels
             EditorManager.instance.ResetEditor();
         }
 
-        /// <summary>
         /// Adds a RawImageUVScroll component to the object.
-        /// </summary>
-        /// <param name="gameObject"></param>
-        /// <param name="scrollSpeed"></param>
         private void AddUVScroll(GameObject gameObject, float scrollSpeed)
         {
             RawImageUVScroll uvScroll = gameObject.AddComponent<RawImageUVScroll>();

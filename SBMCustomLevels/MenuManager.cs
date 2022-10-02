@@ -33,6 +33,10 @@ namespace SBM_CustomLevels
         private bool selectingWorldForAdd = false;
         private string selectedWorldForAdd;
 
+        private int worldCount = 0;
+        private int lastWorldSelected = -1;
+        private List<UIFocusable> customWorlds = new List<UIFocusable>();
+
         private void Awake()
         {
             if (instance == null)
@@ -192,6 +196,7 @@ namespace SBM_CustomLevels
                         levelObject.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
                         {
                             EditorManager.instance.selectedLevel = level;
+                            EditorManager.instance.InEditor = true;
 
                             if (File.ReadAllBytes(level).Length != 0)
                             {
@@ -211,15 +216,93 @@ namespace SBM_CustomLevels
             }
         }
 
+        public void CreateNewWorld(string worldPath)
+        {
+            //worldCount + 6, initially there are 5 worlds
+            //worldCount + 5, world 1 is set at position 0
+
+            GameObject worldModel = Instantiate(FindInactiveGameObject("WorldModel_1"), FindInactiveGameObject("transform").transform); //create a copy of world 1's world model for custom world
+            worldModel.transform.localPosition = new Vector3(5*(worldCount+5), 0, 0); //set to proper position (5 to the right of world 5)
+
+            UIFocusable worldUI_1 = FindInactiveGameObject("World 1").GetComponent<UIFocusable>();
+            UIFocusable worldUI = Instantiate(worldUI_1.gameObject, worldUI_1.transform.parent).GetComponent<UIFocusable>();
+            worldUI.gameObject.name = "World " + (worldCount+6);
+
+            UIWorldSelector worldSelector = FindInactiveGameObject<UIWorldSelector>("World Selector");
+
+            UIFocusableGroup worldSelectorGroup = worldSelector.GetComponent<UIFocusableGroup>();
+            worldSelectorGroup.group = worldSelectorGroup.group.Append(worldUI).ToArray(); //add new world to worldselector group, fixes selected world swapping when changing focus
+
+            int worldIndex = worldCount + 6;
+
+            worldUI.onFocused = new UnityEngine.Events.UnityEvent();
+            worldUI.onFocused.AddListener(delegate
+            {
+                worldSelector.onSelectedWorldIsUnlocked.Invoke();
+                worldSelector.SetSelectedWorldIndex(worldIndex);
+            });
+
+            worldUI.onSubmit.AddListener(delegate
+            {
+                lastWorldSelected = worldIndex;
+            });
+
+            customWorlds.Add(worldUI);
+
+            //set ui navtargets for changing worlds
+            worldUI.navTargetRight = null;
+
+            if (worldCount == 0)
+            {
+                UIFocusable world5 = GameObject.Find("World 5").GetComponent<UIFocusable>();
+
+                worldUI.navTargetLeft = world5;
+                world5.navTargetRight = worldUI;
+            }
+            else
+            {
+                worldUI.navTargetLeft = customWorlds[worldCount - 1];
+                customWorlds[worldCount - 1].navTargetRight = worldUI;  
+            }
+
+            //make world selecting arrows properly animate/color with custom worlds
+            UI.Utilities.Focus.UIFocusableColorShift.Condition newCondition = new UI.Utilities.Focus.UIFocusableColorShift.Condition();
+            newCondition.Focusable = worldUI;
+            newCondition.AnimateWhen = UI.Utilities.Focus.UIFocusableConditionHandler.ConditionType.NotFocused;
+
+            UI.Utilities.Focus.UIFocusableColorShift arrowLeft = FindInactiveGameObject<UI.Utilities.Focus.UIFocusableColorShift>("Arrow_Left");
+            arrowLeft.conditions = arrowLeft.conditions.Append(newCondition).ToArray();
+
+            UI.Utilities.Focus.UIFocusableColorShift arrowRight = FindInactiveGameObject<UI.Utilities.Focus.UIFocusableColorShift>("Arrow_Right");
+            arrowRight.conditions = arrowRight.conditions.Append(newCondition).ToArray();
+
+            UITransitionerCarousel worldNamesTransitioner = GameObject.Find("World Names").GetComponent<UITransitionerCarousel>();
+            GameObject worldName_1 = FindInactiveGameObject<UI.Components.UI_SBMTheme_Text>("Text_WorldTitle_1").gameObject;
+            //end
+
+            GameObject customWorldName = Instantiate(worldName_1, worldName_1.transform.parent);
+            customWorldName.name = "Text_WorldTitle_" + (worldCount+6);
+            customWorldName.SetActive(false);
+            customWorldName.GetComponent<Text>().text = worldPath.Split('\\').Last();
+
+            worldNamesTransitioner.transitioners = worldNamesTransitioner.transitioners.Append(customWorldName.GetComponent<UITransitioner>()).ToArray();
+
+            worldCount++;
+        }
+
         [HarmonyPatch(typeof(UI.MainMenu.StoryMode.UIStoryWorldModels), "Awake")]
         [HarmonyPostfix]
         static void CreateCustomWorlds()
         {
+            instance.worldCount = 0;
+            instance.customWorlds.Clear();
+
             GameObject editorWorldModel = Instantiate(GameObject.Find("WorldModel_1"), GameObject.Find("transform").transform); //create a copy of world 1's world model for editor world
             editorWorldModel.transform.localPosition = new Vector3(-5, 0, 0); //set to proper position (5 to the left of world 1)
 
             UIFocusable worldUI_1 = GameObject.Find("World 1").GetComponent<UIFocusable>(); //cache world 1 ui
-            UIFocusable editorWorldUI = Instantiate(worldUI_1.gameObject).GetComponent<UIFocusable>(); //create a copy of world 1's ui
+            UIFocusable editorWorldUI = Instantiate(worldUI_1.gameObject, worldUI_1.transform).GetComponent<UIFocusable>(); //create a copy of world 1's ui
+            editorWorldUI.name = "World Editor";
             
             //adjust ui targets to account for new world
             worldUI_1.navTargetLeft = editorWorldUI;
@@ -237,7 +320,21 @@ namespace SBM_CustomLevels
             worldNamesTransitioner.transitioners = worldNamesTransitioner.transitioners.Append(editorWorldName.GetComponent<UITransitioner>()).ToArray();
 
             UIWorldSelector worldSelector = FindObjectOfType<UIWorldSelector>();
+
+            UIFocusableGroup worldSelectorGroup = worldSelector.GetComponent<UIFocusableGroup>();
+            worldSelectorGroup.group = worldSelectorGroup.group.Append(editorWorldUI).ToArray(); //add new world to worldselector group, fixes selected world swapping when changing focus
+
             GameObject levelSelector = GameObject.Find("Level Selector");
+
+            worldSelector.GetComponent<UIFocusable>().onFocused.AddListener(delegate
+            {
+                instance.lastWorldSelected = -1;
+            });
+
+            foreach (Tuple<string, List<string>> world in LevelLoader_Mod.worldsList)
+            {
+                instance.CreateNewWorld(world.Item1);
+            }
 
             //create menuui
             AssetBundle loadedBundle = LevelLoader_Mod.GetAssetBundleFromResources("ui-bundle");
@@ -282,6 +379,8 @@ namespace SBM_CustomLevels
                 {
                     Directory.CreateDirectory(path);
                 }
+
+                instance.CreateNewWorld(instance.worldNameField.text);
 
                 instance.worldNameField.text = String.Empty;
                 
@@ -336,13 +435,11 @@ namespace SBM_CustomLevels
             {
                 worldSelector.SetSelectedWorldIndex(5);
                 instance.editorIsFocused = true;
-                Debug.Log(instance.editorIsFocused);
             });
 
             editorWorldUI.onFocusLost.AddListener(delegate
             {
                 instance.editorIsFocused = false;
-                Debug.Log(instance.editorIsFocused);
             });
 
             editorWorldUI.onSubmitSuccess = new UnityEngine.Events.UnityEvent(); //UIFocusable events are CACHED!!!! meaning they are carried over when instantiated :(
@@ -475,11 +572,17 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
         static void OverrideWorldModelIndex(ref int index)
         {
+            Debug.Log("Index: " + index);
+
             if (index == 5)
             {
-                index = -1;
+                index = -1; //allow editor to be before world 1
+            }
+
+            if (index >= 6)
+            {
+                index = index - 1; //account for gap caused by editor being index 5, but at index -1
             }
         }
-
     }
 }
