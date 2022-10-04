@@ -24,7 +24,7 @@ namespace SBM_CustomLevels
             }
         }
 
-        Outline outline;
+        public Outline outline;
 
         //apply outline
         void Awake()
@@ -32,7 +32,7 @@ namespace SBM_CustomLevels
             outline = GetComponent<Outline>();
 
             outline.OutlineColor = new Color32(255, 0, 203, 255);
-            outline.OutlineWidth = 6f;
+            outline.OutlineWidth = 2f;
 
             outline.enabled = false;
         }
@@ -60,7 +60,7 @@ namespace SBM_CustomLevels
 
                 if (snapVector.x == 0)
                 {
-                    snappedPos.x = gameObject.transform.position.x;
+                    snappedPos.x = transform.position.x;
                 }
                 else
                 {
@@ -69,18 +69,18 @@ namespace SBM_CustomLevels
 
                 if (snapVector.y == 0)
                 {
-                    snappedPos.y = gameObject.transform.position.y;
+                    snappedPos.y = transform.position.y;
                 }
                 else
                 {
                     snappedPos.y = Mathf.Round(pos.y / snapVector.y) * snapVector.y;
                 }
 
-                transform.position = new Vector3(snappedPos.x, snappedPos.y, pos.z);
+                transform.position = new Vector3(snappedPos.x, snappedPos.y, transform.position.z);
             }
             else
             {
-                transform.position = new Vector3(pos.x, pos.y, pos.z);
+                transform.position = new Vector3(pos.x, pos.y, transform.position.z);
             }
         }
 

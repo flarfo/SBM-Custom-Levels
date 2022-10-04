@@ -111,8 +111,6 @@ namespace SBM_CustomLevels
             }
 
             return bundle;
-
-            
         }
     }
 }

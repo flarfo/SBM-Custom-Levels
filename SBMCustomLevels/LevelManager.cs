@@ -25,7 +25,7 @@ namespace SBM_CustomLevels
             }
         }
 
-        public void LoadLevelScene() //add input
+        private void LoadLevelScene() //add input
         {
             //create a base scene in assetbundle
             AssetBundle loadedBundle = LevelLoader_Mod.GetAssetBundleFromResources("scene-bundle");
@@ -37,6 +37,8 @@ namespace SBM_CustomLevels
             asyncOperation.completed += delegate (AsyncOperation o)
             {
                 SceneSystem.SetActiveScene("base level");
+
+                loadedBundle.Unload(true);
 
                 AssetBundle loadedBundle2 = LevelLoader_Mod.GetAssetBundleFromResources("sbm-bundle");
 
@@ -55,13 +57,11 @@ namespace SBM_CustomLevels
                     }
                 }
             };
-
-            loadedBundle.Unload(false);
         }
 
 
 
-        public void LoadLevel(bool isEditor, bool newLevel, string path)
+        private void LoadLevel(bool isEditor, bool newLevel, string path)
         {
             LoadLevelScene();
 
@@ -94,7 +94,7 @@ namespace SBM_CustomLevels
             }
         }
 
-        public void LoadJSONLevel(string path)
+        private void LoadJSONLevel(string path)
         {
             Debug.Log(path);
 

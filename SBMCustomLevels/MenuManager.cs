@@ -20,7 +20,6 @@ namespace SBM_CustomLevels
     internal class MenuManager : MonoBehaviour
     {
         public static MenuManager instance;
-        private bool editorIsFocused = false;
 
         private UIFocusable worldNameButton;
         private InputField worldNameField;
@@ -35,6 +34,7 @@ namespace SBM_CustomLevels
 
         private int worldCount = 0;
         private int lastWorldSelected = -1;
+        private int selectedWorldIndex = 0;
         private List<UIFocusable> customWorlds = new List<UIFocusable>();
 
         private void Awake()
@@ -324,7 +324,7 @@ namespace SBM_CustomLevels
             UIFocusableGroup worldSelectorGroup = worldSelector.GetComponent<UIFocusableGroup>();
             worldSelectorGroup.group = worldSelectorGroup.group.Append(editorWorldUI).ToArray(); //add new world to worldselector group, fixes selected world swapping when changing focus
 
-            GameObject levelSelector = GameObject.Find("Level Selector");
+            GameObject levelSelector = FindInactiveGameObject("Level Selector");
 
             worldSelector.GetComponent<UIFocusable>().onFocused.AddListener(delegate
             {
@@ -334,6 +334,11 @@ namespace SBM_CustomLevels
             foreach (Tuple<string, List<string>> world in LevelLoader_Mod.worldsList)
             {
                 instance.CreateNewWorld(world.Item1);
+            }
+
+            foreach (UIFocusable level in levelSelector.GetComponent<UIFocusableGroup>().group)
+            {
+                level.gameObject.AddComponent<CustomLevelID>();
             }
 
             //create menuui
@@ -406,14 +411,25 @@ namespace SBM_CustomLevels
             UIFocusable addSelectedWorldButton = GameObject.Find("AddSelectedWorldButton").GetComponent<UIFocusable>();
             addSelectedWorldButton.onSubmitSuccess.AddListener(delegate
             {
+                if (instance.selectedWorldForAdd == null)
+                {
+                    return;
+                }
+
                 string[] levels = Directory.GetFiles(instance.selectedWorldForAdd);
                 string levelName = "";
 
                 for (int i = 0; i < levels.Length+1; i++)
                 {
-                    if (!File.Exists(Path.Combine(instance.selectedWorldForAdd, (i + 1).ToString())))
+                    Debug.Log(i);
+
+                    if (!File.Exists(Path.Combine(instance.selectedWorldForAdd, (i + 1).ToString() + ".sbm")))
                     {
                         levelName = (i + 1).ToString() + ".sbm";
+
+                        Debug.Log("success");
+
+                        break;
                     }
                 }
 
@@ -421,7 +437,8 @@ namespace SBM_CustomLevels
 
                 if (path.IndexOfAny(Path.GetInvalidPathChars()) < 0 && !File.Exists(path))
                 {
-                    File.Create(path);
+                    using (File.Create(path))
+
                     instance.UpdateWorldButtons();
                 }
                 else
@@ -434,12 +451,6 @@ namespace SBM_CustomLevels
             editorWorldUI.onFocused.AddListener(delegate
             {
                 worldSelector.SetSelectedWorldIndex(5);
-                instance.editorIsFocused = true;
-            });
-
-            editorWorldUI.onFocusLost.AddListener(delegate
-            {
-                instance.editorIsFocused = false;
             });
 
             editorWorldUI.onSubmitSuccess = new UnityEngine.Events.UnityEvent(); //UIFocusable events are CACHED!!!! meaning they are carried over when instantiated :(
@@ -492,6 +503,8 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
         static bool OverrideSelectedWorldIndex(UIWorldSelector __instance, int index)
         {
+            instance.selectedWorldIndex = index;
+
             if (index >= 5)
             {
                 __instance.onWorldSelected.Invoke(index);
@@ -532,10 +545,61 @@ namespace SBM_CustomLevels
 
         [HarmonyPatch(typeof(UI.MainMenu.StoryMode.UIStoryLevelButtons), "SetWorldIndex")]
         [HarmonyPrefix]
-        static bool OverrideWorldIndex(int index)
+        static bool OverrideLevelButtons(UI.MainMenu.StoryMode.UIStoryLevelButtons __instance, int index)
         {
-            if (index >= 5)
+            if (index == 5) //if level editor, dont set index
             {
+                return false;
+            }
+
+            UIFocusableGroup levelGroup = __instance.GetComponent<UIFocusableGroup>();
+
+            if (index >= 6) //if custom world, adjust level numbers
+            {
+                Debug.Log(LevelLoader_Mod.worldsList.Count);
+                int levelCount = LevelLoader_Mod.worldsList[index - 6].Item2.Count;
+                
+                for (int i = 0; i < levelCount; i++)
+                {
+                    if (i > 10)
+                    {
+                        break;
+                    }
+                    
+                    UI.MainMenu.StoryMode.UIStoryLevelButton levelButton = levelGroup.group[i].GetComponent<UI.MainMenu.StoryMode.UIStoryLevelButton>();
+
+                    levelButton.SetLevelNumber(i + 1);
+                    levelButton.GetComponent<CustomLevelID>().ID = LevelLoader_Mod.worldsList[index - 6].Item2[i];
+                    levelButton.gameObject.SetActive(true);
+                }
+                
+                for (int i = 0; i < levelGroup.group.Length; i++)
+                {
+                    if (i > levelCount)
+                    {
+                        levelGroup.group[i].gameObject.SetActive(false);
+                    }
+                }
+
+                return false;
+            }
+
+            for (int i = 0; i < levelGroup.group.Length; i++) //if not custom world, reactivate all buttons assuming some disabled
+            {
+                levelGroup.group[i].gameObject.SetActive(true);
+            }
+
+            return true;
+        }
+
+        [HarmonyPatch(typeof(UI.MainMenu.StoryMode.UIStoryLevelButtons), "OnLevelButtonSubmit")]
+        [HarmonyPrefix]
+        static bool OverrideLevelSelect(UI.MainMenu.StoryMode.UIStoryLevelButton b)
+        {
+            if (instance.selectedWorldIndex >= 6) //if custom world selected, load custom level
+            {
+                LevelManager.instance.BeginLoadLevel(false, false, b.GetComponent<CustomLevelID>().ID);
+
                 return false;
             }
 
@@ -583,6 +647,17 @@ namespace SBM_CustomLevels
             {
                 index = index - 1; //account for gap caused by editor being index 5, but at index -1
             }
+        }
+    }
+
+    class CustomLevelID : MonoBehaviour
+    {
+        private string id;
+
+        public string ID
+        {
+            get { return id; }
+            set { id = value; }
         }
     }
 }

@@ -14,7 +14,7 @@ namespace SBM_CustomLevels
         //position at which camera exists
         private float zCoord = -5.8f;
 
-        public bool freeCam = false;
+        private float dragZoomScale = 1f;
 
         private void Awake()
         {
@@ -23,44 +23,33 @@ namespace SBM_CustomLevels
             transform.position = new Vector3(0, 0, zCoord);
         }
 
-        //drag to move when middle click
         private void LateUpdate()
-        {   
-            if (freeCam)
-            {
-                return;
-            }
-
+        {
+            //drag to move when middle click
             if (Input.GetKeyDown(KeyCode.Mouse2))
             {
-                lastPos = transform.position/8;
+                lastPos = transform.position/8/dragZoomScale; //adjust lastpos based on scaled drag speed
 
                 Vector3 mousePos = Input.mousePosition;
 
-                panOrigin = camera.ScreenToViewportPoint(new Vector3(mousePos.x, mousePos.y, zCoord));
+                panOrigin = camera.ScreenToViewportPoint(new Vector3(mousePos.x, mousePos.y, transform.position.z));
             }
+
+            dragZoomScale = Mathf.Clamp(transform.position.z / -5.8f, 0.25f, 12); //change drag speed based on zoom (further = faster)
 
             if (Input.GetKey(KeyCode.Mouse2))
             {
                 Vector3 mousePos = Input.mousePosition;
 
-                Vector3 pos = camera.ScreenToViewportPoint(new Vector3(mousePos.x, mousePos.y, zCoord)) - panOrigin;
+                Vector3 pos = camera.ScreenToViewportPoint(new Vector3(mousePos.x, mousePos.y, transform.position.z)) - panOrigin;
 
-                Vector3 finalPos = (lastPos - pos) * 8 ;
+                Vector3 finalPos = (lastPos - pos) * 8 * dragZoomScale; //scale drag speed
 
-                transform.position = new Vector3(finalPos.x, finalPos.y, zCoord);                                         
+                transform.position = new Vector3(finalPos.x, finalPos.y, transform.position.z);                                         
             }
 
-            if (Input.GetKeyDown(KeyCode.Pause))
-            {
-                freeCam = !freeCam;
-            }
-        }
-
-        //freecam
-        private void Update()
-        {
-
+            //scroll zoom
+            transform.position = new Vector3(transform.position.x, transform.position.y, Mathf.Clamp(transform.position.z + Input.mouseScrollDelta.y, -100f, -0.8f));
         }
 
         //prevent camera from automatically following player, disrupting drag movement

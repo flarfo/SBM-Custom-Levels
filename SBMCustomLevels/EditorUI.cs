@@ -38,6 +38,8 @@ namespace SBM_CustomLevels
                 Destroy(this);
             }
 
+
+
             nameField = GameObject.Find("NameText").GetComponent<Text>();
             positionField = GameObject.Find("PositionContainer").GetComponentsInChildren<InputField>();
             rotationField = GameObject.Find("RotationContainer").GetComponentsInChildren<InputField>();

@@ -45,6 +45,8 @@ namespace SBM_CustomLevels
 
         //currently selected objects
         public List<EditorSelectable> curSelected = new List<EditorSelectable>();
+        public List<EditorSelectable> copiedObjects = new List<EditorSelectable>();
+
 
         private void Awake()
         {
@@ -91,6 +93,72 @@ namespace SBM_CustomLevels
             if (Input.GetKey(KeyCode.LeftControl))
             {
                 ctrlClicked = true;
+            }
+
+            if (Input.GetKeyDown(KeyCode.C) && ctrlClicked) //copy objects
+            {
+                foreach (EditorSelectable editorSelectable in copiedObjects)
+                {
+                    Destroy(editorSelectable.gameObject);
+                }
+
+                copiedObjects.Clear();
+
+                foreach (EditorSelectable editorSelectable in curSelected)
+                {
+                    EditorSelectable newObject = Instantiate(editorSelectable);
+                    copiedObjects.Add(newObject);
+                    newObject.gameObject.SetActive(false);
+                }
+            }
+
+            if (Input.GetKeyDown(KeyCode.V) && ctrlClicked) //paste objects
+            {
+                Debug.Log(curSelected.Count);
+
+                if (copiedObjects.Count > 0)
+                {
+                    foreach (EditorSelectable editorSelectable in curSelected)
+                    {
+                        editorSelectable.Selected = false;
+                    }
+
+                    curSelected.Clear();
+
+                    foreach (EditorSelectable editorSelectable in copiedObjects)
+                    {
+                        EditorSelectable newObject = Instantiate(editorSelectable);
+                        newObject.gameObject.SetActive(true);
+
+                        newObject.GetComponent<Outline>().FixInstantiated();
+
+                        newObject.Selected = true;
+                        newObject.gameObject.name = newObject.gameObject.name.Replace("(Clone)", "");
+
+                        curSelected.Add(newObject);
+                    }
+                }
+            }
+
+            if (Input.GetKeyDown(KeyCode.X) && ctrlClicked) //cut objects
+            {
+                foreach (EditorSelectable editorSelectable in copiedObjects)
+                {
+                    Destroy(editorSelectable.gameObject);
+                }
+
+                copiedObjects.Clear();
+
+                foreach (EditorSelectable editorSelectable in curSelected)
+                {
+                    EditorSelectable newObject = Instantiate(editorSelectable);
+                    copiedObjects.Add(newObject);
+                    newObject.gameObject.SetActive(false);
+
+                    Destroy(editorSelectable.gameObject);
+                }
+
+                curSelected.Clear();
             }
 
             if (Input.GetKeyUp(KeyCode.Mouse0))
@@ -206,6 +274,8 @@ namespace SBM_CustomLevels
             selectedLevel = null;
 
             curSelected = new List<EditorSelectable>();
+            copiedObjects = new List<EditorSelectable>();
+
             snapVector = new Vector2(0, 0);
 
             moveTool = false;

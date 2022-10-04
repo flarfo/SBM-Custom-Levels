@@ -12,7 +12,6 @@ using UnityEngine;
 
 namespace SBM_CustomLevels
 {
-
     [DisallowMultipleComponent]
     public class Outline : MonoBehaviour
     {
@@ -58,7 +57,7 @@ namespace SBM_CustomLevels
         }
 
         [Serializable]
-        private class ListVector3
+        public class ListVector3
         {
             public List<Vector3> data;
         }
@@ -79,16 +78,16 @@ namespace SBM_CustomLevels
         private bool precomputeOutline;
 
         [SerializeField, HideInInspector]
-        private List<Mesh> bakeKeys = new List<Mesh>();
+        public List<Mesh> bakeKeys = new List<Mesh>();
 
         [SerializeField, HideInInspector]
-        private List<ListVector3> bakeValues = new List<ListVector3>();
+        public List<ListVector3> bakeValues = new List<ListVector3>();
 
         private Renderer[] renderers;
         private Material outlineMaskMaterial;
         private Material outlineFillMaterial;
 
-        private bool needsUpdate;
+        public bool needsUpdate;
 
         void Awake()
         {
@@ -107,6 +106,20 @@ namespace SBM_CustomLevels
 
             // Apply material properties immediately
             needsUpdate = true;
+        }
+
+        public void FixInstantiated() //instantiating an object with outlines breaks the outlines (duplicates, then one pair is permanently baked)
+        {
+            //fix by resetting materials
+            MeshRenderer renderer = GetComponent<MeshRenderer>();
+
+            foreach (Material mat in renderer.materials)
+            {
+                if (mat.name.Contains("Outline"))
+                {
+                    Destroy(mat);
+                }
+            }
         }
 
         void OnEnable()
