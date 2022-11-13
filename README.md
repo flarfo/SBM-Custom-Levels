@@ -15,7 +15,9 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 -Download the [latest release](https://github.com/flarfo/SBM-Custom-Levels/releases)
 
 -Navigate to your Super Bunny Man installation
-
+<p align="left">
+    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/install-step2.png" height="273" width="576">
+</p>
 -Extract the contents of the release directly into the folder
 
 -Have fun!
