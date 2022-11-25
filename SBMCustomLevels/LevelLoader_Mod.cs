@@ -23,7 +23,12 @@ namespace SBM_CustomLevels
         public static readonly int maxLevels = 10;
         public static readonly int maxWorlds = 16;
 
-        public static AssetBundle asyncBundle;
+        public static Material skyboxWorld1;
+        public static Material skyboxWorld2;
+        public static Material skyboxWorld3;
+        public static Material skyboxWorld4;
+
+        public static GameObject fakeWater;
 
         //initialize plugin and start harmony
         private void Awake()
@@ -49,6 +54,16 @@ namespace SBM_CustomLevels
 
             GameObject menuManager = new GameObject("MenuManager", typeof(MenuManager));
             menuManager.hideFlags = HideFlags.HideAndDontSave;
+
+            AssetBundle sbmBundle = GetAssetBundleFromResources("sbm-bundle");
+
+            skyboxWorld1 = sbmBundle.LoadAsset<Material>("Skybox_World1");
+            skyboxWorld2 = sbmBundle.LoadAsset<Material>("Skybox_World2");
+            skyboxWorld3 = sbmBundle.LoadAsset<Material>("Skybox_World3");
+            skyboxWorld4 = sbmBundle.LoadAsset<Material>("Skybox_World4");
+
+            fakeWater = sbmBundle.LoadAsset<GameObject>("Water");
+            fakeWater.AddComponent<FakeWater>();
         }
         
         public static void UpdateWorldsList()
@@ -59,7 +74,7 @@ namespace SBM_CustomLevels
 
             foreach (string world in Directory.GetDirectories(levelsPath))
             {
-                if (count >= maxWorlds)
+                if (count == maxWorlds)
                 {
                     break;
                 }

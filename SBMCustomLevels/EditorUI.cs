@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using SBM.UI.Components;
@@ -17,7 +16,7 @@ namespace SBM_CustomLevels
         public InputField[] rotationField;
         public InputField[] scaleField;
 
-        private Text lastSavedText;
+        public Text lastSavedText;
 
         private GameObject uiBarBottom;
         private bool bottomBarEnabled = false;
@@ -38,8 +37,6 @@ namespace SBM_CustomLevels
                 Destroy(this);
             }
 
-
-
             nameField = GameObject.Find("NameText").GetComponent<Text>();
             positionField = GameObject.Find("PositionContainer").GetComponentsInChildren<InputField>();
             rotationField = GameObject.Find("RotationContainer").GetComponentsInChildren<InputField>();
@@ -51,6 +48,7 @@ namespace SBM_CustomLevels
 
             Button moveButton = GameObject.Find("MoveButton").GetComponent<Button>();
             Button selectButton = GameObject.Find("SelectButton").GetComponent<Button>();
+            Button deleteButton = GameObject.Find("DeleteButton").GetComponent<Button>();
 
             //movebutton functionality
             moveButton.onClick.AddListener(delegate
@@ -88,6 +86,16 @@ namespace SBM_CustomLevels
                 }
             });
 
+            deleteButton.onClick.AddListener(delegate
+            {
+                foreach (EditorSelectable editorSelectable in EditorManager.instance.curSelected)
+                {
+                    Destroy(editorSelectable.gameObject);
+                }
+
+                EditorManager.instance.curSelected.Clear();
+            });
+
             //save button saves when clicked
             lastSavedText = GameObject.Find("LastSavedText").GetComponent<Text>();
             Button saveButton = GameObject.Find("SaveButton").GetComponent<Button>();
@@ -117,15 +125,21 @@ namespace SBM_CustomLevels
             
             //set snap values when SnapUI text is submitted
             InputField snapFieldX = GameObject.Find("SnapFieldX").GetComponent<InputField>();
-            snapFieldX.onSubmit.AddListener(delegate (string value)
+            snapFieldX.onValueChanged.AddListener(delegate (string value)
             {
-                EditorManager.instance.SetSnapX(float.Parse(value));
+                if (float.TryParse(value, out float result))
+                {
+                    EditorManager.instance.SetSnapX(result);
+                }
             });
             
             InputField snapFieldY = GameObject.Find("SnapFieldY").GetComponent<InputField>();
-            snapFieldY.onSubmit.AddListener(delegate (string value)
+            snapFieldY.onValueChanged.AddListener(delegate (string value)
             {
-                EditorManager.instance.SetSnapY(float.Parse(value));
+                if (float.TryParse(value, out float result))
+                {
+                    EditorManager.instance.SetSnapY(result);
+                }
             });
             
             //adds submit events for inputfield UI in the inspector (when enter press, apply transformation to object based on text input)
@@ -169,23 +183,138 @@ namespace SBM_CustomLevels
             foreach (Button button in GameObject.Find("UIBar_Bottom").GetComponentsInChildren<Button>())
             {
                 //if water...
+                if (button.gameObject.name.Contains("BG"))
+                {
+                    button.onClick.AddListener(delegate
+                    {
+                        Destroy(EditorManager.instance.background);
+
+                        switch (button.gameObject.name)
+                        {
+                            case "WorldBG_1":
+                                RenderSettings.skybox = LevelLoader_Mod.skyboxWorld1;
+                                EditorManager.instance.worldStyle = 1;
+                                break;
+                            case "World_2_BG":
+                                RenderSettings.skybox = LevelLoader_Mod.skyboxWorld2;
+                                EditorManager.instance.worldStyle = 2;
+                                break;
+                            case "World3_BG":
+                                RenderSettings.skybox = LevelLoader_Mod.skyboxWorld3;
+                                EditorManager.instance.worldStyle = 3;
+                                break;
+                            case "World4_BG":
+                                RenderSettings.skybox = LevelLoader_Mod.skyboxWorld4;
+                                EditorManager.instance.worldStyle = 4;
+                                break;
+                            case "World5_BG":
+                                RenderSettings.skybox = LevelLoader_Mod.skyboxWorld1;
+                                EditorManager.instance.worldStyle = 5;
+                                break;
+                            default:
+                                RenderSettings.skybox = LevelLoader_Mod.skyboxWorld1;
+                                break;
+                        }
+
+                        EditorManager.instance.background = Instantiate(Resources.Load<GameObject>(RecordLevel.NameToPath(button.gameObject.name)));
+                        RenderSettings.skybox.shader = Shader.Find("Skybox/Horizon With Sun Skybox");
+
+                        //light
+                    });
+
+                    continue;
+                }
 
                 button.onClick.AddListener(delegate
                 {
-                    GameObject spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
+                    GameObject spawnedObject;
+                    Vector3 centerPos = EditorManager.instance.editorCamera.ScreenToWorldPoint(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+
+                    if (button.gameObject.name == "Water")
+                    {
+                        spawnedObject = Instantiate(LevelLoader_Mod.fakeWater);
+
+                        FakeWater fakeWater = spawnedObject.GetComponent<FakeWater>();
+                        fakeWater.width = 3;
+                        fakeWater.height = 2;
+                    }
+                    else if (button.gameObject.name == "Wormhole")
+                    {
+                        if (EditorManager.instance.wormhole)
+                        {
+                            EditorManager.instance.wormhole.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
+
+                            return;
+                        }
+
+                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
+
+                        EditorManager.instance.wormhole = spawnedObject;
+                    }
+                    else
+                    {
+                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
+                    }
 
                     spawnedObject.AddComponent<Outline>();
                     EditorSelectable selectable = spawnedObject.AddComponent<EditorSelectable>();
 
-                    Vector3 centerPos = EditorManager.instance.editorCamera.ScreenToWorldPoint(new Vector3(Screen.width / 2, Screen.height / 2, 0));
-
                     spawnedObject.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
 
-                    if (!spawnedObject.GetComponent<Collider>())
+                    if (spawnedObject.layer == 10)
                     {
-                        //current hotfix, add custom collider versions of certain objects (palm trees, signs, etc. just use thin box colliders or load mesh from bundle?
+                        spawnedObject.layer = 0;
+                    }
+
+                    if (button.gameObject.name == "CarrotDestroyer")
+                    {
+                        spawnedObject.transform.localScale = new Vector3(1, 1, 1);
+                    }
+                    else if (button.gameObject.name == "IceSledSpikesGuide")
+                    {
+                        spawnedObject.AddComponent<MeshRenderer>().material = LevelLoader_Mod.skyboxWorld1; //CHANGE
+                    }
+                    else if (button.gameObject.name == "Carrot")
+                    {
+                        EditorManager.instance.Carrot = spawnedObject;
+                    }
+                        
+
+                    if (spawnedObject.TryGetComponent(out MeshCollider meshCollider))
+                    {
+                        meshCollider.enabled = true;
+                    }
+                    else if (spawnedObject.GetComponent<Collider>())
+                    {
+
+                    }
+                    else if (!spawnedObject.GetComponent<Collider>() && spawnedObject.GetComponent<MeshFilter>())
+                    {
                         spawnedObject.AddComponent<MeshCollider>();
-                        //loadedObject.AddComponent<BoxCollider>();
+                    }
+                    else
+                    {
+                        MeshCollider[] meshColliders = spawnedObject.GetComponentsInChildren<MeshCollider>();
+
+                        if (meshColliders.Length != 0)
+                        {
+                            foreach (MeshCollider collider in meshColliders)
+                            {
+                                collider.enabled = true;
+                            }
+                        }
+                        else
+                        {
+                            MeshFilter[] meshFilters = spawnedObject.GetComponentsInChildren<MeshFilter>();
+
+                            if (meshFilters.Length != 0)
+                            {
+                                foreach (MeshFilter filter in meshFilters)
+                                {
+                                    filter.gameObject.AddComponent<MeshCollider>();
+                                }
+                            }
+                        }
                     }
 
                     foreach (EditorSelectable curSelectable in EditorManager.instance.curSelected)
@@ -255,14 +384,23 @@ namespace SBM_CustomLevels
         // When InputField text is submitted, apply position transform on currently selected objects based on text.
         void AddPositionInputEvent(InputField inputField, int coordinate)
         {
-            inputField.onSubmit.AddListener(delegate (string value)
+            inputField.onValueChanged.AddListener(delegate (string value)
             {
+                if (!inputField.isFocused) //fix for rapid clicking objects sets their position to inspector values of other object
+                {
+                    return;
+                }
+
                 foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
                 {
                     Vector3 pos = selectable.transform.position;
-                    pos[coordinate] = float.Parse(value);
 
-                    selectable.transform.position = pos;
+                    if (float.TryParse(value, out float result))
+                    {
+                        pos[coordinate] = result;
+
+                        selectable.transform.position = pos;
+                    }
                 }
             });
         }
@@ -270,14 +408,23 @@ namespace SBM_CustomLevels
         // When InputField text is submitted, apply rotation transform on currently selected objects based on text.
         void AddRotationInputEvent(InputField inputField, int coordinate)
         {
-            inputField.onSubmit.AddListener(delegate (string value)
+            inputField.onValueChanged.AddListener(delegate (string value)
             {
+                if (!inputField.isFocused) //fix for rapid clicking objects sets their position to inspector values of other object
+                {
+                    return;
+                }
+
                 foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
                 {
                     Vector3 rot = selectable.transform.rotation.eulerAngles;
-                    rot[coordinate] = float.Parse(value);
 
-                    selectable.transform.rotation = Quaternion.Euler(rot);
+                    if (float.TryParse(value, out float result))
+                    {
+                        rot[coordinate] = result;
+
+                        selectable.transform.rotation = Quaternion.Euler(rot);
+                    }
                 }
             });
         }
@@ -285,14 +432,37 @@ namespace SBM_CustomLevels
         // When InputField text is submitted, apply scale transform on currently selected objects based on text.
         void AddScaleInputEvent(InputField inputField, int coordinate)
         {
-            inputField.onSubmit.AddListener(delegate (string value)
+            inputField.onValueChanged.AddListener(delegate (string value)
             {
+                if (!inputField.isFocused) //fix for rapid clicking objects sets their position to inspector values of other object
+                {
+                    return;
+                }
+
                 foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
                 {
                     Vector3 scale = selectable.transform.localScale;
-                    scale[coordinate] = float.Parse(value);
 
-                    selectable.transform.localScale = scale;
+                    if (float.TryParse(value, out float result))
+                    {
+                        FakeWater fakeWater = selectable.gameObject.GetComponent<FakeWater>();
+
+                        if (fakeWater)
+                        {
+                            if (coordinate == 0)
+                            {
+                                fakeWater.width = result;
+                            }
+                            else if (coordinate == 1)
+                            {
+                                fakeWater.height = result;
+                            }
+                        }
+
+                        scale[coordinate] = result;
+
+                        selectable.transform.localScale = scale;
+                    }
                 }
             });
         }

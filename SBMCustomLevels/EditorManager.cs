@@ -1,8 +1,9 @@
-﻿using UnityEngine;
-using HarmonyLib;
+﻿using System;
+using UnityEngine;
 using System.IO;
 using System.Collections.Generic;
 using UnityEngine.EventSystems;
+using Newtonsoft.Json;
 
 namespace SBM_CustomLevels
 {
@@ -10,7 +11,9 @@ namespace SBM_CustomLevels
     {
         public static EditorManager instance;
 
-        private bool inEditor = false;
+        public GameObject background;
+
+        private static bool inEditor = false;
 
         public string selectedLevel;
 
@@ -26,7 +29,28 @@ namespace SBM_CustomLevels
 
         private GameObject editorUI;
 
-        public bool InEditor 
+        public int worldStyle = 1;
+
+        public static Mesh defaultCube;
+
+        private GameObject carrot;
+        public GameObject Carrot 
+        {
+            get
+            {
+                return carrot;
+            }
+            set
+            {
+                Destroy(carrot);
+
+                carrot = value;
+            }
+        }
+
+        public GameObject wormhole;
+
+        public static bool InEditor 
         {
             get
             {
@@ -68,15 +92,12 @@ namespace SBM_CustomLevels
             outlineFill = loadedBundle.LoadAsset<Material>("OutlineFill");
 
             loadedBundle.Unload(false);
+
+            defaultCube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
         }
 
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                RecordLevel.RecordJSONLevel();
-            }
-
             if (!inEditor)
             {
                 return;
@@ -106,6 +127,11 @@ namespace SBM_CustomLevels
 
                 foreach (EditorSelectable editorSelectable in curSelected)
                 {
+                    if (editorSelectable.gameObject.name.Contains("Wormhole") || editorSelectable.gameObject.name.Contains("Carrot"))
+                    {
+                        continue; //dont copy paste wormhole or carrot (should only be one of each)
+                    }
+
                     EditorSelectable newObject = Instantiate(editorSelectable);
                     copiedObjects.Add(newObject);
                     newObject.gameObject.SetActive(false);
@@ -114,8 +140,6 @@ namespace SBM_CustomLevels
 
             if (Input.GetKeyDown(KeyCode.V) && ctrlClicked) //paste objects
             {
-                Debug.Log(curSelected.Count);
-
                 if (copiedObjects.Count > 0)
                 {
                     foreach (EditorSelectable editorSelectable in curSelected)
@@ -166,6 +190,24 @@ namespace SBM_CustomLevels
                 mouseUp = true;
             }
 
+            if (Input.GetKeyDown(KeyCode.S) && ctrlClicked)
+            {
+                RecordLevel.RecordJSONLevel();
+
+                //set save timestamp
+                EditorUI.instance.lastSavedText.text = "Saved: " + DateTime.Now.ToString("HH:mm");
+            }
+
+            if (Input.GetKeyDown(KeyCode.Delete))
+            {
+                foreach (EditorSelectable editorSelectable in curSelected)
+                {
+                    Destroy(editorSelectable.gameObject);
+                }
+
+                curSelected.Clear();
+            }
+
             //selects object under mouse when select tool is active
             if (Input.GetKeyDown(KeyCode.Mouse0))
             {
@@ -196,7 +238,17 @@ namespace SBM_CustomLevels
 
             if (Physics.Raycast(ray, out hit))
             {
-                EditorSelectable hitSelectable = hit.collider.GetComponent<EditorSelectable>();
+                EditorSelectable hitSelectable;
+
+                if (hit.collider.transform.root)
+                {
+                    hitSelectable = hit.collider.transform.root.GetComponent<EditorSelectable>();
+                }
+                else
+                {
+                    hitSelectable = hit.collider.GetComponent<EditorSelectable>();
+                }
+                 
 
                 if (hitSelectable)
                 {
@@ -268,26 +320,23 @@ namespace SBM_CustomLevels
         public void ResetEditor()
         {
             Debug.LogError("Editor reset!");
-
-            InEditor = false;
-
+            wormhole = null;
             selectedLevel = null;
-
             curSelected = new List<EditorSelectable>();
             copiedObjects = new List<EditorSelectable>();
-
+            snapEnabled = false;
             snapVector = new Vector2(0, 0);
-
             moveTool = false;
             selectTool = false;
-
             mouseUp = false;
+            background = null;
+            worldStyle = 1;
         }
 
         //loads EXISTING level in editor mode
         public static void LoadEditorLevel(string path)
         {
-            instance.InEditor = true;
+            InEditor = true;
 
             if (!Directory.Exists(LevelLoader_Mod.levelsPath))
             {
@@ -299,52 +348,60 @@ namespace SBM_CustomLevels
                 return;
             }
 
-            string[] jsonLines = File.ReadAllLines(path);
+            string rawText = File.ReadAllText(path).Remove(0, 1);
 
-            JsonObject jsonObject;
+            ObjectContainer json = JsonConvert.DeserializeObject<ObjectContainer>(rawText);
 
-            Vector3 spawnPos_1 = (JsonUtility.FromJson(jsonLines[0], typeof(FloatObject)) as FloatObject).GetPosition();
-            Vector3 spawnPos_2 = (JsonUtility.FromJson(jsonLines[1], typeof(FloatObject)) as FloatObject).GetPosition();
+            Vector3 spawnPos_1 = json.spawnPosition1.GetPosition();
+            Vector3 spawnPos_2 = json.spawnPosition2.GetPosition();
 
-            for (int i = 2; i < jsonLines.Length; i++)
+            foreach (DefaultObject defaultObject in json.defaultObjects) //itearate through default objects, instantiate based on name
             {
-                jsonObject = JsonUtility.FromJson(jsonLines[i], typeof(JsonObject)) as JsonObject;
+                GameObject loadedObject;
 
-                GameObject loadedObject = GameObject.Instantiate(Resources.Load(jsonObject.objectName) as GameObject, jsonObject.GetPosition(), Quaternion.Euler(jsonObject.GetRotation()));
-
-                loadedObject.transform.localScale = jsonObject.GetScale();
+                loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                loadedObject.transform.localScale = defaultObject.GetScale();
 
                 loadedObject.AddComponent<Outline>();
-
                 loadedObject.AddComponent<EditorSelectable>();
 
-                if (!loadedObject.GetComponent<Collider>())
+                if (loadedObject.layer == 10)
                 {
-                    //current hotfix, add custom collider versions of certain objects (palm trees, signs, etc. just use thin box colliders or load mesh from bundle?
-                    loadedObject.AddComponent<MeshCollider>();
-                    //loadedObject.AddComponent<BoxCollider>();
+                    loadedObject.layer = 0;
                 }
             }
 
-            //set positions (first 2 lines of json file?)
+            foreach (WaterObject waterObject in json.waterObjects) //iterate through water objects, apply separate water logic (height, width via component)
+            {
+                GameObject loadedObject;
+
+                loadedObject = Instantiate(LevelLoader_Mod.fakeWater, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation()));
+
+                loadedObject.transform.localScale = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1);
+
+                FakeWater fakeWater = loadedObject.GetComponent<FakeWater>();
+                fakeWater.width = waterObject.waterWidth;
+                fakeWater.height = waterObject.waterHeight;
+
+                loadedObject.AddComponent<Outline>();
+                loadedObject.AddComponent<EditorSelectable>();
+            }
+
             GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_1.transform.position = spawnPos_1;
 
             GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_2.transform.position = spawnPos_2;
-
-            //create cloud spawner (rework for specific clouds..)
-            /*SBM.Objects.Common.Cloud.CloudSpawner cloudSpawner = Instantiate(Resources.Load("prefabs/level/Cloud Spawner") as GameObject).GetComponent<SBM.Objects.Common.Cloud.CloudSpawner>();
-            cloudSpawner.CloudPrefabs.Clear();
-            cloudSpawner.CloudPrefabs.Add(Resources.Load("prefabs/level/world1/Cloud_W1") as GameObject);*/
         }
 
         //creates a new base level in editor mode
         public static void LoadNewEditorLevel()
         {
-            instance.InEditor = true;
+            InEditor = true;
 
-            Instantiate(Resources.Load("prefabs/level/Carrot"));
+            GameObject carrot = Instantiate(Resources.Load(Path.Combine("prefabs", "level", "Carrot"))) as GameObject;
+            carrot.AddComponent<Outline>();
+            carrot.AddComponent<EditorSelectable>();
 
             GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_1.transform.position = new Vector3(0, 0, 0);
@@ -369,7 +426,7 @@ namespace SBM_CustomLevels
             loadedBundle.Unload(false);
         }
 
-        private void OnEditor(bool editorEnabled)
+        private static void OnEditor(bool editorEnabled)
         {
             Physics.autoSimulation = !editorEnabled;
 

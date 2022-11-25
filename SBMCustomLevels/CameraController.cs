@@ -57,7 +57,7 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
         static bool StopCameraMovement()
         {
-            return !EditorManager.instance.InEditor;
+            return !EditorManager.InEditor;
         }
     }
 }

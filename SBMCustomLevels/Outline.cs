@@ -101,8 +101,11 @@ namespace SBM_CustomLevels
             outlineMaskMaterial.name = "OutlineMask (Instance)";
             outlineFillMaterial.name = "OutlineFill (Instance)";
 
-            // Retrieve or generate smooth normals
-            LoadSmoothNormals();
+            // Retrieve or generate smooth normals (water uses runtime generated mesh, doesn't work properly)
+            if (!gameObject.name.Contains("Water"))
+            {
+                LoadSmoothNormals();
+            }
 
             // Apply material properties immediately
             needsUpdate = true;

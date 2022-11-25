@@ -1,6 +1,9 @@
 ﻿using System;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using UnityEngine;
 using System.IO;
+using System.Linq;
 using System.Collections.Generic;
 using Object = UnityEngine.Object;
 
@@ -58,29 +61,36 @@ namespace SBM_CustomLevels
                 Directory.CreateDirectory(LevelLoader_Mod.levelsPath);
             }
 
-            WriteJSON(FindObjectsOfType(typeof(GameObject)) as GameObject[]);
+            WriteJSON(FindObjectsOfType(typeof(EditorSelectable)) as EditorSelectable[]);
         }
 
-        static void WriteJSON(GameObject[] objects)
+        static void WriteJSON(EditorSelectable[] objects)
         {
-            List<string> jsonList = new List<string>();
+            List<DefaultObject> defaultObjects = new List<DefaultObject>();
+            List<WaterObject> waterObjects = new List<WaterObject>();
 
-            jsonList.Add(JsonUtility.ToJson(new FloatObject(GameObject.Find("PlayerSpawn_1"))));
-            jsonList.Add(JsonUtility.ToJson(new FloatObject(GameObject.Find("PlayerSpawn_2"))));
+            string worldStyle = EditorManager.instance.worldStyle.ToString();
+
+            FloatObject spawnPos1 = new FloatObject(GameObject.Find("PlayerSpawn_1"));
+            FloatObject spawnPos2 = new FloatObject(GameObject.Find("PlayerSpawn_2"));
 
             for (int i = 0; i < objects.Length; i++)
             {
                 string objectName = NameToPath(objects[i].name);
 
-                if (objectName != string.Empty)
+                if (objectName != string.Empty && !objectName.Contains("Water"))
                 {
-                    jsonList.Add(JsonUtility.ToJson(new JsonObject(objects[i])));
+                    defaultObjects.Add(new DefaultObject(objects[i].gameObject));
+                }
+                else if (objectName.Contains("Water"))
+                {
+                    waterObjects.Add(new WaterObject(objects[i].gameObject));
                 }
             }
 
             string filePath = Path.Combine(LevelLoader_Mod.levelsPath, EditorManager.instance.selectedLevel);
 
-            File.WriteAllLines(filePath, jsonList);
+            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, defaultObjects, waterObjects), Formatting.Indented) });
         }
 
         public static string NameToPath(string goName)
@@ -127,39 +137,12 @@ namespace SBM_CustomLevels
                 {
                     path = Path.Combine(baseResourcesPath, "world5");
                 }
-                
+
             }
             else return "";
 
             return Path.Combine(path, goName);
         }
 
-        [Serializable]
-        public class JsonObject
-        {
-            public string objectName;
-
-            public float[] position = new float[3];
-            public float[] rotation = new float[3];
-            public float[] scale = new float[3];
-
-
-            public JsonObject(GameObject gameObject)
-            {
-                objectName = NameToPath(gameObject.name);
-
-                position[0] = gameObject.transform.position.x;
-                position[1] = gameObject.transform.position.y;
-                position[2] = gameObject.transform.position.z;
-
-                rotation[0] = gameObject.transform.rotation.eulerAngles.x;
-                rotation[1] = gameObject.transform.rotation.eulerAngles.y;
-                rotation[2] = gameObject.transform.rotation.eulerAngles.z;
-
-                scale[0] = gameObject.transform.localScale.x;
-                scale[1] = gameObject.transform.localScale.y;
-                scale[2] = gameObject.transform.localScale.z;
-            }
-        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using Newtonsoft.Json;
 
 namespace SBM_CustomLevels
 {
@@ -7,6 +8,12 @@ namespace SBM_CustomLevels
     public class FloatObject
     {
         public float[] position = new float[3];
+
+        [JsonConstructor]
+        public FloatObject()
+        {
+
+        }
 
         public FloatObject(GameObject gameObject)
         {

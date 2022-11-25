@@ -196,15 +196,15 @@ namespace SBM_CustomLevels
                         levelObject.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
                         {
                             EditorManager.instance.selectedLevel = level;
-                            EditorManager.instance.InEditor = true;
+                            EditorManager.InEditor = true;
 
                             if (File.ReadAllBytes(level).Length != 0)
                             {
-                                LevelManager.instance.BeginLoadLevel(true, false, level); // if level is not empty, load as existing level
+                                LevelManager.instance.BeginLoadLevel(true, false, level, 0); // if level is not empty, load as existing level
                             }
                             else
                             {
-                                LevelManager.instance.BeginLoadLevel(true, true, level); // if level is empty, load as new level (create carrot, prefabs, etc.)
+                                LevelManager.instance.BeginLoadLevel(true, true, level, 0); // if level is empty, load as new level (create carrot, prefabs, etc.)
                             }
                         });
 
@@ -254,7 +254,7 @@ namespace SBM_CustomLevels
 
             if (worldCount == 0)
             {
-                UIFocusable world5 = GameObject.Find("World 5").GetComponent<UIFocusable>();
+                UIFocusable world5 = FindInactiveGameObject<UIFocusable>("World 5");
 
                 worldUI.navTargetLeft = world5;
                 world5.navTargetRight = worldUI;
@@ -338,7 +338,7 @@ namespace SBM_CustomLevels
 
             foreach (UIFocusable level in levelSelector.GetComponent<UIFocusableGroup>().group)
             {
-                level.gameObject.AddComponent<CustomLevelID>();
+                level.gameObject.AddComponent<CustomLevelID>(); // add custom id component to identify which custom level each button points to
             }
 
             //create menuui
@@ -362,10 +362,6 @@ namespace SBM_CustomLevels
             });
 
             GameObject editLevelButton = GameObject.Find("EditLevelButton");
-            editLevelButton.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
-            {
-                
-            });
 
             instance.UpdateWorldButtons();
 
@@ -556,35 +552,47 @@ namespace SBM_CustomLevels
 
             if (index >= 6) //if custom world, adjust level numbers
             {
-                Debug.Log(LevelLoader_Mod.worldsList.Count);
                 int levelCount = LevelLoader_Mod.worldsList[index - 6].Item2.Count;
                 
                 for (int i = 0; i < levelCount; i++)
                 {
-                    if (i > 10)
+                    if (i == 10)
                     {
                         break;
                     }
                     
                     UI.MainMenu.StoryMode.UIStoryLevelButton levelButton = levelGroup.group[i].GetComponent<UI.MainMenu.StoryMode.UIStoryLevelButton>();
 
+                    levelButton.levelLock.SetActive(false);
                     levelButton.SetLevelNumber(i + 1);
                     levelButton.GetComponent<CustomLevelID>().ID = LevelLoader_Mod.worldsList[index - 6].Item2[i];
+                    levelButton.GetComponent<CustomLevelID>().levelNumber = i+1;
+
                     levelButton.gameObject.SetActive(true);
                 }
                 
                 for (int i = 0; i < levelGroup.group.Length; i++)
                 {
-                    if (i > levelCount)
+                    if (i >= levelCount)
                     {
                         levelGroup.group[i].gameObject.SetActive(false);
                     }
                 }
 
+                if (levelCount == 0)
+                {
+                    UI.MainMenu.StoryMode.UIStoryLevelButton levelButton = levelGroup.group[0].GetComponent<UI.MainMenu.StoryMode.UIStoryLevelButton>();
+                    levelButton.gameObject.SetActive(true);
+
+                    levelButton.GetComponentInChildren<Text>().text = "No";
+                    levelButton.levelLock.SetActive(true);
+                    levelButton.GetComponent<CustomLevelID>().ID = "NULL LEVEL";
+                }
+
                 return false;
             }
 
-            for (int i = 0; i < levelGroup.group.Length; i++) //if not custom world, reactivate all buttons assuming some disabled
+            for (int i = 0; i < levelGroup.group.Length; i++) //if not custom world, reactivate all buttons (assuming some are disabled)
             {
                 levelGroup.group[i].gameObject.SetActive(true);
             }
@@ -598,7 +606,12 @@ namespace SBM_CustomLevels
         {
             if (instance.selectedWorldIndex >= 6) //if custom world selected, load custom level
             {
-                LevelManager.instance.BeginLoadLevel(false, false, b.GetComponent<CustomLevelID>().ID);
+                if (b.GetComponent<CustomLevelID>().ID == "NULL LEVEL") //if custom world has no levels, this button is the "No Levels" button - should not enter a level
+                {
+                    return false;
+                }
+
+                LevelManager.instance.BeginLoadLevel(false, false, b.GetComponent<CustomLevelID>().ID, b.GetComponent<CustomLevelID>().levelNumber);
 
                 return false;
             }
@@ -653,6 +666,7 @@ namespace SBM_CustomLevels
     class CustomLevelID : MonoBehaviour
     {
         private string id;
+        public int levelNumber;
 
         public string ID
         {

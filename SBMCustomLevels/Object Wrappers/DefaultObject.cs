@@ -1,10 +1,11 @@
 ﻿using UnityEngine;
 using System;
+using Newtonsoft.Json;
 
 namespace SBM_CustomLevels
 {
     [Serializable]
-    public class JsonObject
+    public class DefaultObject
     {
         public string objectName;
 
@@ -12,9 +13,15 @@ namespace SBM_CustomLevels
         public float[] rotation = new float[3];
         public float[] scale = new float[3];
 
-        public JsonObject(GameObject gameObject)
+        [JsonConstructor]
+        public DefaultObject()
         {
-            objectName = gameObject.name;
+
+        }
+
+        public DefaultObject(GameObject gameObject)
+        {
+            objectName = RecordLevel.NameToPath(gameObject.name);
 
             position[0] = gameObject.transform.position.x;
             position[1] = gameObject.transform.position.y;
@@ -28,6 +35,7 @@ namespace SBM_CustomLevels
             scale[1] = gameObject.transform.localScale.y;
             scale[2] = gameObject.transform.localScale.z;
         }
+
 
         public Vector3 GetPosition()
         {
