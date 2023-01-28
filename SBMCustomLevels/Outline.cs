@@ -95,8 +95,8 @@ namespace SBM_CustomLevels
             renderers = GetComponentsInChildren<Renderer>();
 
             // Instantiate outline materials
-            outlineMaskMaterial = Instantiate(EditorManager.instance.outlineMask);
-            outlineFillMaterial = Instantiate(EditorManager.instance.outlineFill);
+            outlineMaskMaterial = Instantiate(EditorManager.outlineMask);
+            outlineFillMaterial = Instantiate(EditorManager.outlineFill);
 
             outlineMaskMaterial.name = "OutlineMask (Instance)";
             outlineFillMaterial.name = "OutlineFill (Instance)";
@@ -114,13 +114,16 @@ namespace SBM_CustomLevels
         public void FixInstantiated() //instantiating an object with outlines breaks the outlines (duplicates, then one pair is permanently baked)
         {
             //fix by resetting materials
-            MeshRenderer renderer = GetComponent<MeshRenderer>();
+            Renderer[] renderers = GetComponentsInChildren<Renderer>();
 
-            foreach (Material mat in renderer.materials)
+            foreach (Renderer renderer in renderers)
             {
-                if (mat.name.Contains("Outline"))
+                foreach (Material mat in renderer.materials)
                 {
-                    Destroy(mat);
+                    if (mat.name.Contains("Outline"))
+                    {
+                        Destroy(mat);
+                    }
                 }
             }
         }

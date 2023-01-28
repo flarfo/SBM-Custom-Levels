@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System;
 using System.Reflection;
+using SplineMesh;
 using SceneSystem = SBM.Shared.SceneSystem;
 using Systems = SBM.Shared.Systems;
 
@@ -19,6 +20,8 @@ namespace SBM_CustomLevels
 
         public float curWaterHeight = 0;
         public float curWaterWidth = 0;
+
+        private int lastWorldStyle = 1;
 
         private static bool inLevel;
 
@@ -35,6 +38,7 @@ namespace SBM_CustomLevels
         }
 
         public int levelNumber;
+        public string currentLevel;
 
         public string PreviousSceneName { get; private set; }
 
@@ -60,7 +64,7 @@ namespace SBM_CustomLevels
             AssetBundle sceneBundle = LevelLoader_Mod.GetAssetBundleFromResources("scene-bundle");
 
             LoadSceneParameters loadSceneParameters = new LoadSceneParameters(LoadSceneMode.Additive);
-            
+
             AsyncOperation asyncOperation = SceneManager.LoadSceneAsync("base level", loadSceneParameters);
 
             asyncOperation.completed += delegate (AsyncOperation o)
@@ -68,24 +72,6 @@ namespace SBM_CustomLevels
                 SceneSystem.SetActiveScene("base level");
 
                 sceneBundle.Unload(true);
-
-                int worldStyle;
-
-                if (int.TryParse(File.ReadLines(path).FirstOrDefault(), out int result))
-                {
-                    if (result == 0)
-                    {
-                        result = 1;
-                    }
-
-                    worldStyle = result;
-                }
-                else
-                {
-                    worldStyle = 1;
-                }
-
-                CreateBackground(worldStyle, isEditor);
 
                 Scene sceneByName = SceneManager.GetSceneByName("base level");
 
@@ -95,13 +81,15 @@ namespace SBM_CustomLevels
                     {
                         SceneManager.MoveGameObjectToScene(gameObject, sceneByName);
                     }
-                }
+                }   
             };
         }
 
         private void LoadLevel(bool isEditor, bool newLevel, string path)
         {
             LoadLevelScene(path, isEditor);
+
+            int worldStyle = 1;
 
             if (isEditor)
             {
@@ -118,7 +106,8 @@ namespace SBM_CustomLevels
             }
             else
             {
-                LoadJSONLevel(path);
+                lastWorldStyle = worldStyle;
+                worldStyle = LoadJSONLevel(path);
             }
 
             Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject); //must happen AFTER carrot is loaded in, otherwise some stuff is goofed^
@@ -131,17 +120,33 @@ namespace SBM_CustomLevels
                 EditorManager.instance.editorCamera = Camera.main;
 
                 Destroy(GameObject.Find("Player 1"));
-                Destroy(GameObject.Find("Carrot(Clone)"));
+                GameObject player2 = GameObject.Find("Player 2");
+                if (player2)
+                {
+                    Destroy(player2);
+                }
+
+                SBM.Shared.Audio.AudioSystem.FadeOutMusicVolume();
             }
             else
             {
-                SBM.Shared.Audio.AudioSystem.instance.musicMain.volume = 1f;
-                SBM.Shared.Audio.AudioSystem.instance.musicIntro.volume = 1f;
-                SBM.Shared.Audio.AudioSystem.instance.ScheduleSong(SBM.Shared.Audio.AudioSystem.instance.MenuTheme, true); //FIND SOME WAY TO SCHEDULE ACCURATE SONG BASED ON WORLD (CFG file?)
+                //play correct music for world style (based on world background selected)
+                SBM.Shared.Audio.Song song = SBM.Shared.Level.LevelSystem.GetWorld(worldStyle - 1).Song;
+
+                bool playIntro = true;
+
+                // if last world style is different, play intro
+                // if last world style is same, dont play intro
+                if (lastWorldStyle == worldStyle)
+                {
+                    playIntro = false;
+                }
+
+                SBM.Shared.Audio.AudioSystem.instance.ScheduleSong(song, playIntro);
             }
         }
 
-        private void LoadJSONLevel(string path)
+        private int LoadJSONLevel(string path)
         {
             Debug.Log(path);
 
@@ -152,10 +157,14 @@ namespace SBM_CustomLevels
 
             if (!File.Exists(path))
             {
-                return;
+                return -1;
             }
 
-            string rawText = File.ReadAllText(path).Remove(0,1);
+            string rawText = File.ReadAllText(path);
+            int worldStyle = (int)char.GetNumericValue(rawText[0]);
+            rawText = rawText.Remove(0, 1);
+
+            CreateBackground(worldStyle, false);
 
             ObjectContainer json = JsonConvert.DeserializeObject<ObjectContainer>(rawText);
 
@@ -172,13 +181,24 @@ namespace SBM_CustomLevels
 
             foreach (WaterObject waterObject in json.waterObjects) //iterate through water objects, apply separate water logic (height, width via component)
             {
-                GameObject loadedObject;
+                SBM.Shared.Utilities.Water.Water loadedObject;
 
                 curWaterHeight = waterObject.waterHeight;
                 curWaterWidth = waterObject.waterWidth;
 
-                loadedObject = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation()));
+                loadedObject = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponent<SBM.Shared.Utilities.Water.Water>();
+
+                if (waterObject.keyframes.Count > 0)
+                {
+                    loadedObject.AnimateWaterHeight = true;
+                    loadedObject.WaterHeightVsTime = new AnimationCurve(waterObject.keyframes.ToArray());
+                }
                 //further logic in Patches.InitializeWaterValues
+            }
+
+            foreach (RailObject railObject in json.railObjects)
+            {
+                GameObject rail = MinecartRailHelper.CreateRailFromObject(railObject, false);
             }
 
             GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
@@ -186,19 +206,21 @@ namespace SBM_CustomLevels
 
             GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_2.transform.position = spawnPos_2;
+
+            return worldStyle;
         }
 
         public void BeginLoadLevel(bool isEditor, bool newLevel, string path, int level)
         {
             if (!File.Exists(path))
             {
-                Debug.LogError("Level does not exist!");
+                Debug.Log("Level does not exist!");
                 return;
             }
 
             if (File.ReadAllBytes(path).Length == 0 && !isEditor)
             {
-                Debug.LogError("Empty level attempted to load! Make sure to save in editor first.");
+                Debug.Log("Empty level attempted to load! Make sure to save in editor first.");
                 return;
             }
 
@@ -211,28 +233,55 @@ namespace SBM_CustomLevels
 
             if (!isEditor)
             {
-                SBM.Shared.Cameras.MenuCamera menuCamera = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<SBM.Shared.Cameras.MenuCamera>();
-                menuCamera.targetPos = new Vector3(-0.715f, 4.05f, 21.96f);
-                menuCamera.targetLookAt = new Vector3(-0.63f, 5.76f, 27.03f);
+                currentLevel = path;
 
-                SBM.UI.Utilities.Focus.UIFocusable.FocusedObject.gameObject.transform.parent.GetComponent<SBM.UI.Utilities.Transitioner.UITransitioner>().Transition_Out_To_Right(); //parent of level button is level selector
-                SBM.UI.Utilities.Focus.UIFocusable.ReleaseFocusedObject();
-                wormholeManager.WormholeAnimation(path, level);
+                if (!LevelManager.InLevel)
+                {
+                    SBM.Shared.Cameras.MenuCamera menuCamera = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<SBM.Shared.Cameras.MenuCamera>();
+                    menuCamera.targetPos = new Vector3(-0.715f, 4.05f, 21.96f);
+                    menuCamera.targetLookAt = new Vector3(-0.63f, 5.76f, 27.03f);
+
+                    SBM.UI.Utilities.Focus.UIFocusable.FocusedObject.gameObject.transform.parent.GetComponent<SBM.UI.Utilities.Transitioner.UITransitioner>().Transition_Out_To_Right(); //parent of level button is level selector
+                    SBM.UI.Utilities.Focus.UIFocusable.ReleaseFocusedObject();
+                    wormholeManager.WormholeAnimation(path, level);
+                }
+                else
+                {
+                    InLevel = true;
+
+                    SceneSystem.Unload(PreviousSceneName).completed += delegate (AsyncOperation o)
+                    {
+                        LoadLevel(isEditor, newLevel, path);
+                    };
+
+                }   
             }
             else
             {
                 SceneSystem.Unload(PreviousSceneName).completed += delegate (AsyncOperation o)
                 {
-                    if (!isEditor)
-                    {
-                        InLevel = true;
-
-                        levelNumber = level;
-                    }
-
                     LoadLevel(isEditor, newLevel, path);
                 };
             }
+        }
+
+        public string GetNextLevel()
+        {
+            string nextLevel = "";
+
+            if (currentLevel != null)
+            {
+                FileInfo[] levelPaths = Directory.GetParent(currentLevel).GetFiles("*.sbm");
+
+                if (levelPaths.Length-1 > levelNumber-1) // if next level exists... levelNumber-1 since level number is + 1.
+                {
+                    nextLevel = levelPaths[levelNumber].ToString();
+                }
+
+                levelNumber++;
+            }
+
+            return nextLevel;
         }
 
         public void CreateBackground(int worldStyle, bool isEditor)
@@ -273,6 +322,20 @@ namespace SBM_CustomLevels
             {
                 EditorManager.instance.background = bg;
             }
+        }
+
+        public static void FadeOutCustomScene(Color start, Color end, SBM.UI.Components.ScreenFader screenFader)
+        {
+            screenFader.gameObject.SetActive(true);
+            screenFader.startColor = start;
+            screenFader.endColor = end;
+            screenFader.fadeStartTime = Time.realtimeSinceStartup;
+
+            PropertyInfo property = typeof(SBM.UI.Components.ScreenFader).GetProperty("IsFading"); //access private setter for "IsFading"
+            property.DeclaringType.GetProperty("IsFading");
+            property.GetSetMethod(true).Invoke(screenFader, new object[] { true });
+
+            SBM.Shared.Audio.AudioSystem.FadeOutMusicVolume();
         }
 
         public class WormholeTransitionManager : MonoBehaviour
@@ -379,20 +442,6 @@ namespace SBM_CustomLevels
                 {
                     transitionManager = wormholeManager;
                     state = _state;
-                }
-
-                private void FadeOutCustomScene(Color start, Color end, SBM.UI.Components.ScreenFader screenFader)
-                {
-                    screenFader.gameObject.SetActive(true);
-                    screenFader.startColor = start;
-                    screenFader.endColor = end;
-                    screenFader.fadeStartTime = Time.realtimeSinceStartup;
-
-                    PropertyInfo property = typeof(SBM.UI.Components.ScreenFader).GetProperty("IsFading"); //access private setter for "IsFading"
-                    property.DeclaringType.GetProperty("IsFading");
-                    property.GetSetMethod(true).Invoke(screenFader, new object[] { true });
-
-                    SBM.Shared.Audio.AudioSystem.FadeOutMusicVolume();
                 }
 
                 public bool MoveNext()

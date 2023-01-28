@@ -61,6 +61,7 @@ namespace SBM_CustomLevels
                 Directory.CreateDirectory(LevelLoader_Mod.levelsPath);
             }
 
+            //TODO: add try/catch to prevent saving with errors
             WriteJSON(FindObjectsOfType(typeof(EditorSelectable)) as EditorSelectable[]);
         }
 
@@ -68,29 +69,39 @@ namespace SBM_CustomLevels
         {
             List<DefaultObject> defaultObjects = new List<DefaultObject>();
             List<WaterObject> waterObjects = new List<WaterObject>();
+            List<RailObject> railObjects = new List<RailObject>();
 
             string worldStyle = EditorManager.instance.worldStyle.ToString();
+            Debug.Log("World Style: " + worldStyle);
+            var carrot = FindObjectOfType<SBM.Objects.Common.Carrot.Carrot>();
+            var wormhole = FindObjectOfType<SBM.Objects.Common.Wormhole.Wormhole>();
+            var p1 = GameObject.Find("PlayerSpawn_1");
+            var p2 = GameObject.Find("PlayerSpawn_2");
 
-            FloatObject spawnPos1 = new FloatObject(GameObject.Find("PlayerSpawn_1"));
-            FloatObject spawnPos2 = new FloatObject(GameObject.Find("PlayerSpawn_2"));
+            FloatObject spawnPos1 = new FloatObject(p1);
+            FloatObject spawnPos2 = new FloatObject(p2);
 
             for (int i = 0; i < objects.Length; i++)
             {
                 string objectName = NameToPath(objects[i].name);
 
-                if (objectName != string.Empty && !objectName.Contains("Water"))
-                {
-                    defaultObjects.Add(new DefaultObject(objects[i].gameObject));
-                }
-                else if (objectName.Contains("Water"))
+                if (objectName.Contains("Water"))
                 {
                     waterObjects.Add(new WaterObject(objects[i].gameObject));
+                }
+                else if (objectName.Contains("Rail"))
+                {
+                    railObjects.Add(new RailObject(objects[i].gameObject));
+                }
+                else if (objectName != string.Empty && objectName != "Node")
+                {
+                    defaultObjects.Add(new DefaultObject(objects[i].gameObject));
                 }
             }
 
             string filePath = Path.Combine(LevelLoader_Mod.levelsPath, EditorManager.instance.selectedLevel);
 
-            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, defaultObjects, waterObjects), Formatting.Indented) });
+            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, defaultObjects, waterObjects, railObjects), Formatting.Indented) });
         }
 
         public static string NameToPath(string goName)

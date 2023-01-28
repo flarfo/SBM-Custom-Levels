@@ -6,27 +6,30 @@ namespace SBM_CustomLevels
 {
     public class EditorSelectable : MonoBehaviour
     {
-        Vector3 mouseOffset;
-
-        float zCoord;
-
-        private bool selected = false;
-
         //when selected, add enable outline and set inspector to display object transform values
         public bool Selected
         {
             get { return selected; }
 
-            set 
+            set
             {
                 selected = value;
                 outline.enabled = value;
 
                 SetInspectorInfo();
+
+                // carrots are weird, outlines dont reset when deselected. fixes outline staying baked permanently
+                if (!value && gameObject.name.Contains("Carrot"))
+                {
+                    outline.FixInstantiated();
+                }
             }
         }
-
         public Outline outline;
+
+        Vector3 mouseOffset;
+        float zCoord;
+        private bool selected = false;
 
         //apply outline
         void Awake()
@@ -44,13 +47,10 @@ namespace SBM_CustomLevels
             SetMouseOffset();
         }
 
-        /*private void OnMouseDrag()
+        private void OnDisable()
         {
-            if (selected && EditorManager.instance.moveTool)
-            {
-                MoveObject();
-            }
-        }*/
+            Selected = false;
+        }
 
         public void MoveObject(Vector2 snapVector)
         {

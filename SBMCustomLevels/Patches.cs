@@ -1,16 +1,51 @@
 ﻿using HarmonyLib;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Collections.Generic;
+using System.Collections;
+using System.Reflection.Emit;
 using UnityEngine.UI;
 using SceneSystem = SBM.Shared.SceneSystem;
-using System.Linq;
+using SplineMesh;
 
 namespace SBM_CustomLevels
 {
     [HarmonyPatch]
     internal class Patches
     {
-        [HarmonyPatch(typeof(SceneSystem), "SetActiveScene")]
+		private static IEnumerator WaitToEnableCollider(int frameCount, MeshCollider collider)
+		{
+			for (int i = 0; i < frameCount; i++)
+			{
+				yield return null;
+			}
+
+			collider.enabled = true;
+		}
+
+        [HarmonyPatch(typeof(SBM.Shared.Audio.AudioSystem), "OnSceneEvent")]
+        [HarmonyPostfix]
+		static void FixMenuVolume(SBM.Shared.SceneEvent sceneEvent, Scene scene)
+        {
+			if (sceneEvent == SBM.Shared.SceneEvent.LoadComplete && scene.name == "Menu")
+            {
+				SBM.Shared.Audio.AudioSystem.instance.musicMain.volume = 1f;
+            }
+        }
+
+        [HarmonyPatch(typeof(SBM.UI.Game.StoryMode.UIStoryTimeDetails), "GetSavedTimeRecord")]
+        [HarmonyPrefix]
+		static bool StopGetRecord()
+        {
+			if (LevelManager.InLevel || EditorManager.InEditor)
+            {
+				return false;
+            }
+
+			return true;
+        }
+
+		[HarmonyPatch(typeof(SceneSystem), "SetActiveScene")]
         [HarmonyPrefix]
         static void ExitEditor(string name)
         {
@@ -21,7 +56,23 @@ namespace SBM_CustomLevels
 			}
         }
 
-        [HarmonyPatch(typeof(SBM.Shared.Utilities.Water.Water), "OnValidate")]
+		// meshcollider created in code by SplineMesh has no collision, by disabling and re-enabling the meshcollider, collision returns.
+        [HarmonyPatch(typeof(SplineMeshTiling), "CreateMeshes")]
+        [HarmonyPostfix]
+		static void StupidMeshCollisionFix(SplineMeshTiling __instance)
+        {
+			MeshCollider generatedCollider = __instance.GetComponentInChildren<MeshCollider>();
+			MeshCollider newCollider = __instance.gameObject.AddComponent<MeshCollider>();
+
+			newCollider.enabled = false;
+
+			newCollider.sharedMesh = generatedCollider.sharedMesh;
+			newCollider.gameObject.AddComponent<SBM.Objects.World3.Minecart.MinecartRail>();
+
+			LevelManager.instance.StartCoroutine(WaitToEnableCollider(1, newCollider));
+		}
+
+		[HarmonyPatch(typeof(SBM.Shared.Utilities.Water.Water), "OnValidate")]
         [HarmonyPrefix]
         static void UpdateWaterMesh(SBM.Shared.Utilities.Water.Water __instance)
         {
@@ -111,7 +162,6 @@ namespace SBM_CustomLevels
 			__instance.UpdateColliders();
         }
 
-
 		[HarmonyPatch(typeof(SBM.Shared.Utilities.Water.Water), "Awake")]
 		[HarmonyPrefix]
 		static bool InitializeWaterValues(SBM.Shared.Utilities.Water.Water __instance)
@@ -154,5 +204,125 @@ namespace SBM_CustomLevels
 
 			return true;
 		}
+
+		//there should be no carrot by default, stop checking for carrot object (which might not exist)
+		[HarmonyPatch(typeof(SBM.UI.Game.StoryMode.UICarrotEvent), "Awake")]
+        [HarmonyPrefix]
+		static bool FixEditorUICarrotEvent() 
+        {
+			return !EditorManager.InEditor;
+        }
+
+		[HarmonyPatch(typeof(SBM.Objects.GameModes.Story.GameManagerStory), "Awake")]
+        [HarmonyTranspiler]
+		static IEnumerable<CodeInstruction> FixEditorGameManager(IEnumerable<CodeInstruction> instructions, ILGenerator il)
+		{
+			var codes = new List<CodeInstruction>(instructions);
+
+			int insertionIndex = -1;
+			Label callFindCarrotLabel = il.DefineLabel();
+
+			for (int i = 0; i < codes.Count - 1; i++) // -1 since checking i + 1
+			{
+				if (codes[i].opcode == OpCodes.Call && codes[i - 1].opcode == OpCodes.Call && codes[i + 1].opcode == OpCodes.Ldarg_0) // find point of insertion (before find carrot call)
+				{
+					insertionIndex = i;
+					codes[i].labels.Add(callFindCarrotLabel);
+					break;
+				}
+			}
+
+			var insertInstructions = new List<CodeInstruction>();
+
+			insertInstructions.Add(new CodeInstruction(OpCodes.Ldarg_0));
+			insertInstructions.Add(new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(EditorManager), nameof(EditorManager.inEditor)))); // load inEditor
+			insertInstructions.Add(new CodeInstruction(OpCodes.Brfalse_S, callFindCarrotLabel)); // check if inEditor is false, if false jump to label (skip ret)
+			insertInstructions.Add(new CodeInstruction(OpCodes.Ret)); // if true return, avoid checking for a carrot that might not exist
+
+			if (insertionIndex != -1)
+			{
+				codes.InsertRange(insertionIndex, insertInstructions);
+			}
+
+			return codes;
+		}
+
+		// if inLevel or inEditor, stop original method. if in neither, pass through.
+		[HarmonyPatch(typeof(SBM.Shared.Save.StorySaveData), "GetTimeRecord")]
+        [HarmonyPrefix]
+		static bool StopGetTimeRecord()
+        {
+			return !LevelManager.InLevel && !EditorManager.InEditor; 
+        }
+
+		// dont unlock badges for custom levels (which don't have normal badges) /// NullReferenceException
+        [HarmonyPatch(typeof(SBM.Objects.GameModes.Story.GameManagerStory), "OnRoundEnd")]
+        [HarmonyPrefix]
+		static bool StopBadgeUnlock(SBM.Objects.GameModes.Story.GameManagerStory __instance)
+        {
+			if (LevelManager.InLevel)
+            {
+				if (__instance.cCompleteLevel != null)
+				{
+					__instance.StopCoroutine(__instance.cCompleteLevel);
+				}
+
+				SBM.Shared.GameManager.Instance.timer.Stop();
+				SBM.Shared.Player.SetAllInputEnabled(false);
+
+				foreach (var cameraTarget in SBM.Shared.Cameras.CameraTarget.All)
+				{
+					cameraTarget.TrackingEnabled = false;
+				}
+
+				var wormhole = SBM.Objects.Common.Wormhole.Wormhole.Instance;
+				wormhole.CameraTarget.TrackingEnabled = true;
+				wormhole.Close();
+			}
+
+			return !LevelManager.InLevel;
+        }
+
+		// if a custom level is loaded, there will be no standard "next level," rather next level will be defined by logic stored in the mod.
+		// prevent the game from trying to get this next level based on a nonexistant current level.
+		// since LevelSystem.CurrentStoryLevel is null, a prefix must prevent that code from being run, returning stage 1 instead.
+		[HarmonyPatch(typeof(SBM.Shared.Level.LevelSystem), nameof(SBM.Shared.Level.LevelSystem.NextStoryLevel), MethodType.Getter)]
+        [HarmonyPrefix]
+		static bool StopGetNextLevel(ref SBM.Shared.Level.StoryLevel __result)
+        {
+			if (LevelManager.InLevel)
+            {
+				__result = new SBM.Shared.Level.StoryLevel(1, 1, 1, 1);
+				return false;
+            }
+
+			return true;
+        }
+
+        [HarmonyPatch(typeof(SBM.UI.Game.StoryMode.UIStoryNextLevelQuery), "GoToNextLevel")]
+        [HarmonyPrefix]
+		static bool GoToNextCustomLevel(SBM.UI.Game.StoryMode.UIStoryNextLevelQuery __instance)
+        {
+			if (LevelManager.InLevel)
+            {
+				string nextLevel = LevelManager.instance.GetNextLevel();
+
+				Debug.Log("NEXT LEVEL: " + nextLevel);
+
+				if (nextLevel != string.Empty)
+                {
+					// LevelManager.FadeOutCustomScene(Color.clear, Color.black, __instance.screenFader);
+					LevelManager.instance.BeginLoadLevel(false, false, nextLevel, -1);
+				}
+                else // if no next level, return to menu
+                {
+					SceneSystem.LoadScene("Menu");
+                }
+				
+				return false;
+            }
+
+			return true;	
+        }
 	}
 }

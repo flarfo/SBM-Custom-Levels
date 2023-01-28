@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System;
+using System.Xml.Serialization;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -21,16 +22,18 @@ namespace SBM_CustomLevels
     {
         public static MenuManager instance;
 
+        private UIWorldSelector worldSelector;
+        private UIFocusable editorWorldUI;
+
         private UIFocusable worldNameButton;
         private InputField worldNameField;
 
         private GameObject customWorldSelector;
         private GameObject customLevelSelector;
-        private GameObject addToWorldUI;
-        private Text addToWorldText;
+        //private GameObject addToWorldUI;
+        //private Text addToWorldText;
 
-        private bool selectingWorldForAdd = false;
-        private string selectedWorldForAdd;
+        private string selectedWorld;
 
         private int worldCount = 0;
         private int lastWorldSelected = -1;
@@ -146,18 +149,7 @@ namespace SBM_CustomLevels
                 worldObject.GetComponent<UIFocusable>().onSubmitSuccess.RemoveAllListeners();
                 worldObject.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
                 {
-                    if (selectingWorldForAdd)
-                    {
-                        selectedWorldForAdd = world.Item1;
-                        selectingWorldForAdd = false;
-
-                        instance.addToWorldText.text = world.Item1.Split(Path.DirectorySeparatorChar).Last();
-
-                        instance.customWorldSelector.GetComponent<UITransitioner>().Transition_Out_To_Right();
-                        instance.addToWorldUI.GetComponent<UITransitioner>().Transition_In_From_Top();
-
-                        return;
-                    }
+                    selectedWorld = world.Item1;
 
                     if (world.Item2.Count > 0)
                     {
@@ -166,11 +158,9 @@ namespace SBM_CustomLevels
                     }
                     else
                     {
-                        Debug.Log("No levels found in selected world!");
+                        instance.CreateNewLevel(world.Item1);
                         return;
                     }
-
-                    
 
                     UIFocusableGroup customLevels = customLevelSelector.GetComponent<UIFocusableGroup>();
 
@@ -216,7 +206,56 @@ namespace SBM_CustomLevels
             }
         }
 
-        public void CreateNewWorld(string worldPath)
+        public void UpdateLevelButtons()
+        {
+            UIFocusableGroup customLevels = customLevelSelector.GetComponent<UIFocusableGroup>();
+            List<string> levels = new List<string>();
+
+            foreach (Tuple<string, List<string>> world in LevelLoader_Mod.worldsList)
+            {
+                if (world.Item1 == selectedWorld)
+                {
+                    levels = world.Item2;
+                    break;
+                }
+            }
+
+            int count = 0;
+            foreach (string level in levels) //create level selection ui
+            {
+                print("TEST!");
+
+                if (count >= LevelLoader_Mod.maxLevels)
+                {
+                    break;
+                }
+
+                GameObject levelObject = customLevels.group[count].gameObject;
+                levelObject.SetActive(true);
+
+                levelObject.GetComponentInChildren<Text>().text = (count + 1).ToString();
+
+                levelObject.GetComponent<UIFocusable>().onSubmitSuccess.RemoveAllListeners();
+                levelObject.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
+                {
+                    EditorManager.instance.selectedLevel = level;
+                    EditorManager.InEditor = true;
+
+                    if (File.ReadAllBytes(level).Length != 0)
+                    {
+                        LevelManager.instance.BeginLoadLevel(true, false, level, 0); // if level is not empty, load as existing level
+                    }
+                    else
+                    {
+                        LevelManager.instance.BeginLoadLevel(true, true, level, 0); // if level is empty, load as new level (create carrot, prefabs, etc.)
+                    }
+                });
+
+                count++;
+            }
+        }
+
+        private void CreateNewWorld(string worldPath)
         {
             //worldCount + 6, initially there are 5 worlds
             //worldCount + 5, world 1 is set at position 0
@@ -290,20 +329,86 @@ namespace SBM_CustomLevels
             worldCount++;
         }
 
-        [HarmonyPatch(typeof(UI.MainMenu.StoryMode.UIStoryWorldModels), "Awake")]
-        [HarmonyPostfix]
-        static void CreateCustomWorlds()
+        private void CreateNewLevel(string worldPath)
         {
-            instance.worldCount = 0;
-            instance.customWorlds.Clear();
+            string[] levels = Directory.GetFiles(worldPath);
+            string levelName = "";
 
+            for (int i = 0; i < levels.Length + 1; i++)
+            {
+                Debug.Log(i);
+
+                if (i >= 10)
+                {
+                    return;
+                }
+
+                if (!File.Exists(Path.Combine(worldPath, (i + 1).ToString() + ".sbm")))
+                {
+                    levelName = (i + 1).ToString() + ".sbm";
+
+                    Debug.Log("success");
+
+                    break;
+                }
+            }
+
+            string path = Path.Combine(worldPath, levelName);
+
+            if (path.IndexOfAny(Path.GetInvalidPathChars()) == -1 && !File.Exists(path))
+            {
+                using (File.Create(path)) { }
+
+                //TODO: get and update XML file when creating a new level
+
+                LevelLoader_Mod.UpdateWorldsList();
+
+                instance.UpdateLevelButtons();
+            }
+        }
+
+        //TODO: make faster, fully implement
+        private void CreateCFG(string worldPath) //creates .cfg file for storing world data 
+        {
+            Config config = new Config();
+            XmlSerializer xmlSerializer = new XmlSerializer(typeof(Config));
+            
+            using (TextWriter textWriter = new StreamWriter(Path.Combine(worldPath, "world.cfg")))
+            {
+                xmlSerializer.Serialize(textWriter, config);
+            }
+        }
+
+        private void CreateWorldEvent(string worldName)
+        {
+            string path = Path.Combine(LevelLoader_Mod.levelsPath, worldName);
+
+            if (path.IndexOfAny(Path.GetInvalidPathChars()) < 0 && !Directory.Exists(path))
+            {
+                Directory.CreateDirectory(path);
+            }
+
+            LevelLoader_Mod.UpdateWorldsList();
+
+            instance.CreateNewWorld(path);
+            //instance.CreateCFG(path);
+            instance.CreateNewLevel(path);
+
+            instance.worldNameField.text = String.Empty;
+
+            instance.UpdateWorldButtons();
+        }
+
+        private void CreateEditorWorldSelect()
+        {
             GameObject editorWorldModel = Instantiate(GameObject.Find("WorldModel_1"), GameObject.Find("transform").transform); //create a copy of world 1's world model for editor world
             editorWorldModel.transform.localPosition = new Vector3(-5, 0, 0); //set to proper position (5 to the left of world 1)
 
+
             UIFocusable worldUI_1 = GameObject.Find("World 1").GetComponent<UIFocusable>(); //cache world 1 ui
-            UIFocusable editorWorldUI = Instantiate(worldUI_1.gameObject, worldUI_1.transform).GetComponent<UIFocusable>(); //create a copy of world 1's ui
+            editorWorldUI = Instantiate(worldUI_1.gameObject, worldUI_1.transform).GetComponent<UIFocusable>(); //create a copy of world 1's ui
             editorWorldUI.name = "World Editor";
-            
+
             //adjust ui targets to account for new world
             worldUI_1.navTargetLeft = editorWorldUI;
             editorWorldUI.navTargetRight = worldUI_1;
@@ -316,148 +421,16 @@ namespace SBM_CustomLevels
             editorWorldName.SetActive(false);
 
             editorWorldName.GetComponent<Text>().text = "Level Editor";
-            
-            worldNamesTransitioner.transitioners = worldNamesTransitioner.transitioners.Append(editorWorldName.GetComponent<UITransitioner>()).ToArray();
 
-            UIWorldSelector worldSelector = FindObjectOfType<UIWorldSelector>();
+            worldNamesTransitioner.transitioners = worldNamesTransitioner.transitioners.Append(editorWorldName.GetComponent<UITransitioner>()).ToArray();
 
             UIFocusableGroup worldSelectorGroup = worldSelector.GetComponent<UIFocusableGroup>();
             worldSelectorGroup.group = worldSelectorGroup.group.Append(editorWorldUI).ToArray(); //add new world to worldselector group, fixes selected world swapping when changing focus
-
-            GameObject levelSelector = FindInactiveGameObject("Level Selector");
-
-            worldSelector.GetComponent<UIFocusable>().onFocused.AddListener(delegate
-            {
-                instance.lastWorldSelected = -1;
-            });
-
-            foreach (Tuple<string, List<string>> world in LevelLoader_Mod.worldsList)
-            {
-                instance.CreateNewWorld(world.Item1);
-            }
-
-            foreach (UIFocusable level in levelSelector.GetComponent<UIFocusableGroup>().group)
-            {
-                level.gameObject.AddComponent<CustomLevelID>(); // add custom id component to identify which custom level each button points to
-            }
-
-            //create menuui
-            AssetBundle loadedBundle = LevelLoader_Mod.GetAssetBundleFromResources("ui-bundle");
-            GameObject menuUI = Instantiate(loadedBundle.LoadAsset("MenuUI") as GameObject);
-
-            instance.customWorldSelector = GameObject.Find("CustomWorldSelector");
-            instance.customWorldSelector.transform.localScale = new Vector3(.7f, .7f, .7f);
-
-            instance.customLevelSelector = GameObject.Find("CustomLevelSelector");
-            instance.customLevelSelector.transform.localScale = new Vector3(.7f, .7f, .7f);
-
-            instance.addToWorldUI = GameObject.Find("AddToWorldUI");
-            instance.addToWorldText = GameObject.Find("WorldNameText").GetComponent<Text>();
-
-            GameObject buttonContainer = GameObject.Find("ButtonContainer");
-           
-            buttonContainer.GetComponent<UIFocusable>().onCancel.AddListener(delegate
-            {
-                worldSelector.gameObject.GetComponent<UITransitioner>().Transition_In_From_Center();
-            });
-
-            GameObject editLevelButton = GameObject.Find("EditLevelButton");
-
-            instance.UpdateWorldButtons();
-
-            GameObject newWorldUI = GameObject.Find("NewWorldUI");
-
-            GameObject worldNameUI = GameObject.Find("WorldNameField");
-            instance.worldNameButton = worldNameUI.GetComponent<UIFocusable>();
-            instance.worldNameField = worldNameUI.GetComponent<InputField>();
-
-            GameObject worldCreateButton = GameObject.Find("CreateButton");
-            worldCreateButton.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
-            {
-                string path = Path.Combine(LevelLoader_Mod.levelsPath, instance.worldNameField.text);
-
-                if (path.IndexOfAny(Path.GetInvalidPathChars()) < 0 && !Directory.Exists(path))
-                {
-                    Directory.CreateDirectory(path);
-                }
-
-                instance.CreateNewWorld(instance.worldNameField.text);
-
-                instance.worldNameField.text = String.Empty;
-                
-                instance.UpdateWorldButtons();
-            });
-
-            UIFocusable selectWorldUI = GameObject.Find("SelectWorldButton").GetComponent<UIFocusable>();
-            selectWorldUI.onSubmitSuccess.AddListener(delegate
-            {
-                instance.selectedWorldForAdd = "";
-                instance.selectingWorldForAdd = true;
-
-                instance.addToWorldUI.GetComponent<UITransitioner>().Transition_Out_To_Right();
-                instance.customWorldSelector.GetComponent<UITransitioner>().Transition_In_From_Top();
-            });
-
-            instance.addToWorldUI.GetComponent<UITransitioner>().onTransition_OutEnd.AddListener(delegate
-            {
-                instance.addToWorldText.text = "World Name...";
-                instance.selectedWorldForAdd = "";
-            });
-
-            UIFocusable addSelectedWorldButton = GameObject.Find("AddSelectedWorldButton").GetComponent<UIFocusable>();
-            addSelectedWorldButton.onSubmitSuccess.AddListener(delegate
-            {
-                if (instance.selectedWorldForAdd == null)
-                {
-                    return;
-                }
-
-                string[] levels = Directory.GetFiles(instance.selectedWorldForAdd);
-                string levelName = "";
-
-                for (int i = 0; i < levels.Length+1; i++)
-                {
-                    Debug.Log(i);
-
-                    if (!File.Exists(Path.Combine(instance.selectedWorldForAdd, (i + 1).ToString() + ".sbm")))
-                    {
-                        levelName = (i + 1).ToString() + ".sbm";
-
-                        Debug.Log("success");
-
-                        break;
-                    }
-                }
-
-                string path = Path.Combine(instance.selectedWorldForAdd, levelName);
-
-                if (path.IndexOfAny(Path.GetInvalidPathChars()) < 0 && !File.Exists(path))
-                {
-                    using (File.Create(path))
-
-                    instance.UpdateWorldButtons();
-                }
-                else
-                {
-                    return;
-                }
-            });
-            
 
             editorWorldUI.onFocused.AddListener(delegate
             {
                 worldSelector.SetSelectedWorldIndex(5);
             });
-
-            editorWorldUI.onSubmitSuccess = new UnityEngine.Events.UnityEvent(); //UIFocusable events are CACHED!!!! meaning they are carried over when instantiated :(
-            editorWorldUI.onSubmitSuccess.AddListener(delegate
-            {
-                //open level editor ui
-                buttonContainer.GetComponent<UITransitioner>().Transition_In_From_Right();
-                worldSelector.GetComponent<UITransitioner>().Transition_Out_To_Center();
-            });
-
-            
 
             editorWorldUI.onNavRightSuccess.AddListener(delegate
             {
@@ -466,7 +439,6 @@ namespace SBM_CustomLevels
             });
 
             //adjust listeners so that when loading the level editor UI, no level select menu is brought up
-
             worldUI_1.onNavRightSuccess.AddListener(delegate
             {
                 editorWorldName.SetActive(false);
@@ -484,15 +456,108 @@ namespace SBM_CustomLevels
             editorWorldUI.onNavRightFailed = worldUI_1.onNavRightFailed;
             editorWorldUI.onNavLeftSuccess = worldUI_1.onNavLeftSuccess;
             editorWorldUI.onNavLeftFailed = worldUI_1.onNavLeftFailed;
+        }
+
+        private void CreateWorldSelects()
+        {
+            GameObject levelSelector = FindInactiveGameObject("Level Selector");
+
+            foreach (Tuple<string, List<string>> world in LevelLoader_Mod.worldsList)
+            {
+                instance.CreateNewWorld(world.Item1);
+            }
+
+            foreach (UIFocusable level in levelSelector.GetComponent<UIFocusableGroup>().group)
+            {
+                level.gameObject.AddComponent<CustomLevelID>(); // add custom id component to identify which custom level each button points to
+            }
+        }
+
+        private void CreateMenuUI()
+        {
+            AssetBundle loadedBundle = LevelLoader_Mod.GetAssetBundleFromResources("ui-bundle");
+            GameObject menuUI = Instantiate(loadedBundle.LoadAsset("MenuUI") as GameObject);
+
+            instance.customWorldSelector = GameObject.Find("CustomWorldSelector");
+            instance.customWorldSelector.transform.localScale = new Vector3(.7f, .7f, .7f);
+
+            instance.customLevelSelector = GameObject.Find("CustomLevelSelector");
+            instance.customLevelSelector.transform.localScale = new Vector3(.7f, .7f, .7f);
+
+            GameObject buttonContainer = GameObject.Find("ButtonContainer");
+
+            buttonContainer.GetComponent<UIFocusable>().onCancel.AddListener(delegate
+            {
+                instance.worldSelector.gameObject.GetComponent<UITransitioner>().Transition_In_From_Center();
+            });
+
+            GameObject editLevelButton = GameObject.Find("EditLevelButton");
+            editLevelButton.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
+            {
+                if (worldCount == 0)
+                {
+                    CreateWorldEvent("Default World");
+                }
+            });
+
+
+            instance.UpdateWorldButtons();
+
+            GameObject newWorldUI = GameObject.Find("NewWorldUI");
+
+            GameObject worldNameUI = GameObject.Find("WorldNameField");
+            instance.worldNameButton = worldNameUI.GetComponent<UIFocusable>();
+            instance.worldNameField = worldNameUI.GetComponent<InputField>();
+
+            GameObject worldCreateButton = GameObject.Find("CreateButton");
+            worldCreateButton.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
+            {
+                CreateWorldEvent(instance.worldNameField.text);
+            });
+
+            UIFocusable addLevelButton = GameObject.Find("AddLevelButton").GetComponent<UIFocusable>();
+            addLevelButton.onSubmitSuccess.AddListener(delegate
+            {
+                if (selectedWorld != string.Empty)
+                {
+                    CreateNewLevel(selectedWorld);
+                }
+            });
+
+            editorWorldUI.onSubmitSuccess = new UnityEngine.Events.UnityEvent(); //UIFocusable events are CACHED!!!! meaning they are carried over when instantiated :(
+            editorWorldUI.onSubmitSuccess.AddListener(delegate
+            {
+                //open level editor ui
+                buttonContainer.GetComponent<UITransitioner>().Transition_In_From_Right();
+                worldSelector.GetComponent<UITransitioner>().Transition_Out_To_Center();
+            });
 
             loadedBundle.Unload(false);
 
             buttonContainer.SetActive(false);
-            GameObject.Find("NewLevelContainer").SetActive(false);
             newWorldUI.SetActive(false);
-            GameObject.Find("AddToWorldUI").SetActive(false);
+
             instance.customWorldSelector.SetActive(false);
             instance.customLevelSelector.SetActive(false);
+        }
+
+        [HarmonyPatch(typeof(UI.MainMenu.StoryMode.UIStoryWorldModels), "Awake")]
+        [HarmonyPostfix]
+        static void CreateCustomWorlds()
+        {
+            instance.worldCount = 0;
+            instance.customWorlds.Clear();
+
+            instance.worldSelector = FindObjectOfType<UIWorldSelector>();
+
+            instance.worldSelector.GetComponent<UIFocusable>().onFocused.AddListener(delegate
+            {
+                instance.lastWorldSelected = -1;
+            });
+
+            instance.CreateEditorWorldSelect();
+            instance.CreateWorldSelects();
+            instance.CreateMenuUI();
         }
 
         [HarmonyPatch(typeof(UIWorldSelector), "SetSelectedWorldIndex")]

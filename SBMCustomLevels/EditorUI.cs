@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using SplineMesh;
 using SBM.UI.Components;
 
 namespace SBM_CustomLevels
@@ -8,6 +11,8 @@ namespace SBM_CustomLevels
     internal class EditorUI : MonoBehaviour
     {
         public static EditorUI instance;
+
+        public static GameObject keyframeUI;
         //NOTE: STOP NORMAL GAME UI FROM APPEARING WHILE IN EDITOR
         //MAKE NAME OF OBJECT APPEAR WHEN HOVERED IN UI
         public Text nameField;
@@ -22,10 +27,81 @@ namespace SBM_CustomLevels
         private bool bottomBarEnabled = false;
 
         private Button[] worldButtons = new Button[6];
+        private Button selectButton;
+        private Button moveButton;
         private GameObject[] worldUIs = new GameObject[6];
 
+        private GameObject inspectorUI;
+        private GameObject waterUI;
+        private GameObject railUI;
+
+        public FakeWater curWater;
+        private RectTransform keyframeContainer;
+        private Vector2 defaultKeyframeContainerSize = new Vector2(100, 168);
+        private readonly int maxWaterKeyframes = 16;
+
+        public MinecartRailNode curRailNode;
+        public InputField[] railPositionField;
+        public InputField[] railDirectionField;
+        public InputField[] railUpField;
+
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.W))
+            {
+                OnMoveButton();
+            }
+
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                OnSelectButton();
+            }
+
+            if (Input.GetKeyDown(KeyCode.BackQuote))
+            {
+                OnWorldButton(5);
+            }
+
+            // dont change UI object button world if an inputfield is selected (so updating pos/rot/scale does not change UI window)
+            if (EventSystem.current.currentSelectedGameObject)
+            {
+                if (EventSystem.current.currentSelectedGameObject.TryGetComponent<InputField>(out InputField field))
+                {
+                    if (field.isFocused)
+                    {
+                        return;
+                    }
+                }
+            }
+
+            if (Input.GetKeyDown(KeyCode.Alpha1))
+            {
+                OnWorldButton(0);
+            }
+
+            if (Input.GetKeyDown(KeyCode.Alpha2))
+            {
+                OnWorldButton(1);
+            }
+
+            if (Input.GetKeyDown(KeyCode.Alpha3))
+            {
+                OnWorldButton(2);
+            }
+
+            if (Input.GetKeyDown(KeyCode.Alpha4))
+            {
+                OnWorldButton(3);
+            }
+
+            if (Input.GetKeyDown(KeyCode.Alpha5))
+            {
+                OnWorldButton(4);
+            }
+        }
+
         //initialize the editor ui, finding necessary gameobjects and applying respective functionality
-        void Awake()
+        private void Awake()
         {
             if (instance == null)
             {
@@ -41,60 +117,335 @@ namespace SBM_CustomLevels
             positionField = GameObject.Find("PositionContainer").GetComponentsInChildren<InputField>();
             rotationField = GameObject.Find("RotationContainer").GetComponentsInChildren<InputField>();
             scaleField = GameObject.Find("ScaleContainer").GetComponentsInChildren<InputField>();
+           
+            railPositionField = GameObject.Find("RailPositionContainer").GetComponentsInChildren<InputField>();
+            railDirectionField = GameObject.Find("RailDirectionContainer").GetComponentsInChildren<InputField>();
+            railUpField = GameObject.Find("RailUpContainer").GetComponentsInChildren<InputField>();
 
-            AddUVScroll(GameObject.Find("UIBar_Top"), -2.2f);
-            AddUVScroll(GameObject.Find("UIBar_Right"), -2.2f);
-            AddUVScroll(GameObject.Find("UIBar_Bottom"), -2.2f);
+            inspectorUI = GameObject.Find("Inspector");
+            waterUI = GameObject.Find("WaterContainer");
+            railUI = GameObject.Find("RailContainer");
+           
+            keyframeContainer = GameObject.Find("KeyframeContainer").GetComponent<RectTransform>();
 
-            Button moveButton = GameObject.Find("MoveButton").GetComponent<Button>();
-            Button selectButton = GameObject.Find("SelectButton").GetComponent<Button>();
+            GameObject inspectorDragBar = inspectorUI.transform.Find("DragBar").gameObject;
+            inspectorDragBar.AddComponent<DraggableUI>().target = inspectorUI.transform;
+           
+            GameObject waterDragBar = waterUI.transform.Find("DragBar").gameObject;
+            waterDragBar.AddComponent<DraggableUI>().target = waterUI.transform;
+
+            GameObject railDragBar = railUI.transform.Find("DragBar").gameObject;
+            railDragBar.AddComponent<DraggableUI>().target = railUI.transform;
+
+            Button inspectorMinimizeButton = inspectorDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
+            Button waterMinimizeButton = waterDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
+            Button railMinimizeButton = railDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
+            
+            inspectorMinimizeButton.onClick.AddListener(delegate
+            {
+                GameObject background = inspectorDragBar.transform.parent.Find("Background").gameObject;
+                background.SetActive(!background.activeSelf);
+            });
+
+            waterMinimizeButton.onClick.AddListener(delegate
+            {
+                GameObject background = waterDragBar.transform.parent.Find("Background").gameObject;
+                background.SetActive(!background.activeSelf);
+            });
+
+            railMinimizeButton.onClick.AddListener(delegate
+            {
+                GameObject background = railDragBar.transform.parent.Find("Background").gameObject;
+                background.SetActive(!background.activeSelf);
+            });
+
+            moveButton = GameObject.Find("MoveButton").GetComponent<Button>();
+            selectButton = GameObject.Find("SelectButton").GetComponent<Button>();
             Button deleteButton = GameObject.Find("DeleteButton").GetComponent<Button>();
+            Button undoButton = GameObject.Find("UndoButton").GetComponent<Button>();
+            Button redoButton = GameObject.Find("RedoButton").GetComponent<Button>();
+            Button addKeyframeButton = GameObject.Find("AddKeyframeButton").GetComponent<Button>();
+            Button addRailNodeButton = GameObject.Find("AddRailButton").GetComponent<Button>();
+            Button removeKeyframeButton = GameObject.Find("RemoveKeyframeButton").GetComponent<Button>();
+            Button removeRailNodeButton = GameObject.Find("RemoveRailButton").GetComponent<Button>();
 
             //movebutton functionality
-            moveButton.onClick.AddListener(delegate
-            {
-                EditorManager.instance.moveTool = !EditorManager.instance.moveTool;
-
-                if (EditorManager.instance.moveTool)
-                {
-                    EditorManager.instance.selectTool = false;
-                    moveButton.gameObject.GetComponent<RawImage>().color = Color.green;
-
-                    selectButton.gameObject.GetComponent<RawImage>().color = Color.white;
-                }
-                else
-                {
-                    moveButton.gameObject.GetComponent<RawImage>().color = Color.white;
-                }
-            });
+            moveButton.onClick.AddListener(OnMoveButton);
 
             //selectbutton functionality
-            selectButton.onClick.AddListener(delegate
-            {
-                EditorManager.instance.selectTool = !EditorManager.instance.selectTool;
-
-                if (EditorManager.instance.selectTool)
-                {
-                    EditorManager.instance.moveTool = false;
-                    selectButton.gameObject.GetComponent<RawImage>().color = Color.green;
-
-                    moveButton.gameObject.GetComponent<RawImage>().color = Color.white;
-                }
-                else
-                {
-                    selectButton.gameObject.GetComponent<RawImage>().color = Color.white;
-                }
-            });
+            selectButton.onClick.AddListener(OnSelectButton);
 
             deleteButton.onClick.AddListener(delegate
             {
-                foreach (EditorSelectable editorSelectable in EditorManager.instance.curSelected)
+                if (EditorManager.instance.curSelected.Count == 0)
                 {
-                    Destroy(editorSelectable.gameObject);
+                    return;
                 }
 
+                List<EditorSelectable> deletedObjects = new List<EditorSelectable>();
+
+                foreach (EditorSelectable editorSelectable in EditorManager.instance.curSelected)
+                {
+                    // dont delete rail nodes, this should be managed by the minecart rail ui
+                    if (editorSelectable.gameObject.name == "Node")
+                    {
+                        editorSelectable.Selected = false;
+                        continue;
+                    }
+
+                    editorSelectable.gameObject.SetActive(false);
+                    deletedObjects.Add(editorSelectable);
+                }
+
+                UndoManager.AddUndo(UndoManager.UndoType.Delete, deletedObjects);
                 EditorManager.instance.curSelected.Clear();
             });
+
+            undoButton.onClick.AddListener(delegate
+            {
+                UndoManager.Undo();
+            });
+
+            redoButton.onClick.AddListener(delegate
+            {
+                UndoManager.Redo();
+            });
+
+            addKeyframeButton.onClick.AddListener(delegate
+            {
+                if (curWater == null)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < keyframeContainer.childCount; i++)
+                {
+                    if (!keyframeContainer.GetChild(i).gameObject.activeSelf)
+                    {
+                        keyframeContainer.GetChild(i).gameObject.SetActive(true);
+                        curWater.keyframes.Add(new Keyframe(0, 0));
+
+                        break;
+                    }
+                }
+
+                if (curWater.keyframes.Count > 4 && keyframeContainer.sizeDelta.y != (42*maxWaterKeyframes))
+                {
+                    keyframeContainer.sizeDelta = new Vector2(keyframeContainer.sizeDelta.x, keyframeContainer.sizeDelta.y + 42);
+                }
+            });
+
+            addRailNodeButton.onClick.AddListener(delegate
+            {
+                if (curRailNode)
+                {
+                    MinecartRailNode node = MinecartRailHelper.AddNodeAfterSelected(curRailNode.railSpline, curRailNode.node);
+                    EditorSelectable editorSelectable = node.gameObject.GetComponent<EditorSelectable>();
+
+                    UndoManager.AddUndo(UndoManager.UndoType.AddRailNode, new List<EditorSelectable>() { editorSelectable }, railNode: node);
+                }                
+            });
+
+            removeKeyframeButton.onClick.AddListener(delegate
+            {
+                if (curWater)
+                {
+                    curWater.keyframes.RemoveAt(curWater.keyframes.Count - 1);
+                    SetWaterKeyframes();
+                }
+            });
+
+            removeRailNodeButton.onClick.AddListener(delegate
+            {
+                if (curRailNode)
+                {
+                    if (curRailNode.railSpline.nodes.Count > 2)
+                    {
+                        EditorSelectable editorSelectable = curRailNode.gameObject.GetComponent<EditorSelectable>();
+
+                        UndoManager.AddUndo(UndoManager.UndoType.DeleteRailNode, new List<EditorSelectable>() { editorSelectable }, railNode: curRailNode);
+
+                        curRailNode.railSpline.RemoveNode(curRailNode.node);
+
+                        EditorManager.instance.curSelected.Remove(editorSelectable);
+
+                        curRailNode.gameObject.SetActive(false);
+                        curRailNode = null;
+                    }
+                }
+            });
+
+            railPositionField[0].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!railPositionField[0].isFocused) //fix for rapid clicking objects sets their position to inspector values of other object
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                if (float.TryParse(value, out float result))
+                {
+                    Vector3 pos = new Vector3(result, curRailNode.node.Position.y, curRailNode.node.Position.z);
+                    curRailNode.node.Position = pos;
+                    curRailNode.transform.localPosition = pos;
+                }
+            });
+
+            railPositionField[1].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!railPositionField[1].isFocused) //fix for rapid clicking objects sets their position to inspector values of other object
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                if (float.TryParse(value, out float result))
+                {
+                    Vector3 pos = new Vector3(curRailNode.node.Position.x, result, curRailNode.node.Position.z);
+                    curRailNode.node.Position = pos;
+                    curRailNode.transform.localPosition = pos;
+                }
+            });
+
+            railPositionField[2].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!railPositionField[2].isFocused) //fix for rapid clicking objects sets their position to inspector values of other object
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                if (float.TryParse(value, out float result))
+                {
+                    Vector3 pos = new Vector3(curRailNode.node.Position.x, curRailNode.node.Position.y, result);
+                    curRailNode.node.Position = pos;
+                    curRailNode.transform.localPosition = pos;
+                }
+            });
+
+            railUpField[0].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!railUpField[0].isFocused) //fix for rapid clicking objects sets their position to inspector values of other object
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                if (float.TryParse(value, out float result))
+                {
+                    curRailNode.node.Up = new Vector3(result, curRailNode.node.Up.y, curRailNode.node.Up.z);
+                }
+            });
+
+            railUpField[1].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!railUpField[1].isFocused) //fix for rapid clicking objects sets their position to inspector values of other object
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                if (float.TryParse(value, out float result))
+                {
+                    curRailNode.node.Up = new Vector3(curRailNode.node.Up.x, result, curRailNode.node.Up.z);
+                }
+            });
+
+            railUpField[2].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!railUpField[2].isFocused) //fix for rapid clicking objects sets their position to inspector values of other object
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                if (float.TryParse(value, out float result))
+                {
+                    curRailNode.node.Up = new Vector3(curRailNode.node.Up.x, curRailNode.node.Up.y, result);
+                }
+            });
+
+            // instantiate all water keyframes
+            for (int i = 0; i < maxWaterKeyframes; i++)
+            {
+                GameObject newKeyframe = Instantiate(keyframeUI, keyframeContainer);
+                newKeyframe.name = i.ToString();
+
+                // [0] = time
+                // [1] = value
+                InputField[] inputFields = newKeyframe.GetComponentsInChildren<InputField>();
+                inputFields[0].onValueChanged.AddListener(delegate (string value)
+                {
+                    if (!inputFields[0].isFocused)
+                    {
+                        return;
+                    }
+
+                    if (EditorManager.instance.curSelected.Count == 0)
+                    {
+                        return;
+                    }
+
+                    if (curWater)
+                    {
+                        if (float.TryParse(value, out float result))
+                        {
+                            int index = int.Parse(inputFields[0].transform.parent.parent.name);
+
+                            curWater.keyframes[index] = new Keyframe(result, curWater.keyframes[index].value);
+                        }
+                    }
+                });
+
+                inputFields[1].onValueChanged.AddListener(delegate (string value)
+                {
+                    if (!inputFields[1].isFocused)
+                    {
+                        return;
+                    }
+
+                    if (EditorManager.instance.curSelected.Count == 0)
+                    {
+                        return;
+                    }
+
+                    if (curWater)
+                    {
+                        if (float.TryParse(value, out float result))
+                        {
+                            int index = int.Parse(inputFields[1].transform.parent.parent.name);
+
+                            curWater.keyframes[index] = new Keyframe(curWater.keyframes[index].time, result);
+                        }
+                    }
+                });
+
+                newKeyframe.SetActive(false);
+            }
 
             //save button saves when clicked
             lastSavedText = GameObject.Find("LastSavedText").GetComponent<Text>();
@@ -115,11 +466,11 @@ namespace SBM_CustomLevels
 
                 if (EditorManager.instance.snapEnabled)
                 {
-                    snapEnableButton.gameObject.GetComponent<RawImage>().color = Color.green;
+                    snapEnableButton.gameObject.GetComponent<Image>().color = Color.green;
                 }
                 else
                 {
-                    snapEnableButton.gameObject.GetComponent<RawImage>().color = Color.white;
+                    snapEnableButton.gameObject.GetComponent<Image>().color = Color.white;
                 }
             });
             
@@ -232,17 +583,25 @@ namespace SBM_CustomLevels
 
                     if (button.gameObject.name == "Water")
                     {
-                        spawnedObject = Instantiate(LevelLoader_Mod.fakeWater);
+                        spawnedObject = Instantiate(EditorManager.fakeWater);
 
                         FakeWater fakeWater = spawnedObject.GetComponent<FakeWater>();
                         fakeWater.width = 3;
                         fakeWater.height = 2;
+                        curWater = fakeWater;
+                        ClearWaterKeyframes();
+                        waterUI.SetActive(true);
+                    }
+                    else if (button.gameObject.name == "IceSledSpikesGuide")
+                    {
+                        spawnedObject = Instantiate(EditorManager.iceSledSpikesGuide);
                     }
                     else if (button.gameObject.name == "Wormhole")
                     {
                         if (EditorManager.instance.wormhole)
                         {
                             EditorManager.instance.wormhole.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
+                            EditorManager.instance.wormhole.SetActive(true);
 
                             return;
                         }
@@ -251,13 +610,35 @@ namespace SBM_CustomLevels
 
                         EditorManager.instance.wormhole = spawnedObject;
                     }
+                    else if (button.gameObject.name == "MinecartRail")
+                    {
+                        Vector3 pos = new Vector3(centerPos.x, centerPos.y, 0);
+
+                        spawnedObject = MinecartRailHelper.SpawnNewRail(pos);
+                    }
+                    else if (button.gameObject.name == "PlayerSpawn")
+                    {
+                        if (!EditorManager.instance.spawn1.activeSelf)
+                        {
+                            EditorManager.instance.spawn1.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
+                            EditorManager.instance.spawn1.SetActive(true);
+
+                            return;
+                        }
+                        else if (!EditorManager.instance.spawn2.activeSelf)
+                        {
+                            EditorManager.instance.spawn2.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
+                            EditorManager.instance.spawn2.SetActive(true);
+
+                            return;
+                        }
+
+                        return;
+                    }
                     else
                     {
                         spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                     }
-
-                    spawnedObject.AddComponent<Outline>();
-                    EditorSelectable selectable = spawnedObject.AddComponent<EditorSelectable>();
 
                     spawnedObject.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
 
@@ -269,10 +650,6 @@ namespace SBM_CustomLevels
                     if (button.gameObject.name == "CarrotDestroyer")
                     {
                         spawnedObject.transform.localScale = new Vector3(1, 1, 1);
-                    }
-                    else if (button.gameObject.name == "IceSledSpikesGuide")
-                    {
-                        spawnedObject.AddComponent<MeshRenderer>().material = LevelLoader_Mod.skyboxWorld1; //CHANGE
                     }
                     else if (button.gameObject.name == "Carrot")
                     {
@@ -317,6 +694,9 @@ namespace SBM_CustomLevels
                         }
                     }
 
+                    spawnedObject.AddComponent<Outline>();
+                    EditorSelectable selectable = spawnedObject.AddComponent<EditorSelectable>();
+
                     foreach (EditorSelectable curSelectable in EditorManager.instance.curSelected)
                     {
                         curSelectable.Selected = false;
@@ -326,6 +706,10 @@ namespace SBM_CustomLevels
                     EditorManager.instance.curSelected.Add(selectable);
 
                     selectable.Selected = true;
+
+                    EditorUI.instance.EnableInspector(true);
+
+                    UndoManager.AddUndo(UndoManager.UndoType.Place, new List<EditorSelectable> { selectable });
                 });
             }
 
@@ -333,56 +717,188 @@ namespace SBM_CustomLevels
         }
 
         //objects must be enabled to be found by GameObject.Find(), objects that are not meant to initially be active are disabled
-        void DisableInitialObjects()
+        private void DisableInitialObjects()
         {
             foreach (GameObject gameObject in worldUIs)
             {
                 gameObject.SetActive(false);
             }
 
+            inspectorUI.SetActive(false);
+            waterUI.SetActive(false);
+            railUI.SetActive(false);
             uiBarBottom.SetActive(false);
         }
 
-        /// When given button pressed, open respective blocks panel and disable other block panels that might be open. Disables/enables bottom UI bar.
-        void AddWorldUIEvent(int buttonId)
+        private void OnSelectButton()
         {
-            worldButtons[buttonId].onClick.AddListener(delegate
-            {
-                if (bottomBarEnabled)
-                {
-                    //if panel already open, disable when clicked
-                    if (worldUIs[buttonId].activeSelf)
-                    {
-                        uiBarBottom.SetActive(false);
-                        worldUIs[buttonId].SetActive(false);
+            EditorManager.instance.selectTool = !EditorManager.instance.selectTool;
 
-                        bottomBarEnabled = false;
-                    }
-                    else
-                    {
-                        worldUIs[buttonId].SetActive(true);
-                    }
+            if (EditorManager.instance.selectTool)
+            {
+                EditorManager.instance.moveTool = false;
+                selectButton.gameObject.GetComponent<Image>().color = Color.green;
+
+                moveButton.gameObject.GetComponent<Image>().color = Color.white;
+            }
+            else
+            {
+                selectButton.gameObject.GetComponent<Image>().color = Color.white;
+            }
+        }
+
+        private void OnMoveButton()
+        {
+            EditorManager.instance.moveTool = !EditorManager.instance.moveTool;
+
+            if (EditorManager.instance.moveTool)
+            {
+                EditorManager.instance.selectTool = false;
+                moveButton.gameObject.GetComponent<Image>().color = Color.green;
+
+                selectButton.gameObject.GetComponent<Image>().color = Color.white;
+            }
+            else
+            {
+                moveButton.gameObject.GetComponent<Image>().color = Color.white;
+            }
+        }
+
+        private void OnWorldButton(int buttonId)
+        {
+            if (bottomBarEnabled)
+            {
+                //if panel already open, disable when clicked
+                if (worldUIs[buttonId].activeSelf)
+                {
+                    uiBarBottom.SetActive(false);
+                    worldUIs[buttonId].SetActive(false);
+
+                    bottomBarEnabled = false;
                 }
                 else
                 {
-                    uiBarBottom.SetActive(true);
                     worldUIs[buttonId].SetActive(true);
-
-                    bottomBarEnabled = true;
                 }
+            }
+            else
+            {
+                uiBarBottom.SetActive(true);
+                worldUIs[buttonId].SetActive(true);
 
-                foreach (GameObject ui in worldUIs)
+                bottomBarEnabled = true;
+            }
+
+            foreach (GameObject ui in worldUIs)
+            {
+                if (ui != worldUIs[buttonId])
                 {
-                    if (ui != worldUIs[buttonId])
-                    {
-                        ui.SetActive(false);
-                    }
+                    ui.SetActive(false);
                 }
+            }
+        }
+
+        public void EnableInspector(bool enable)
+        {
+            inspectorUI.SetActive(enable);
+        }
+
+        public void EnableWaterUI(bool enable)
+        {
+            waterUI.SetActive(enable);
+        }
+
+        public void EnableRailUI(bool enable)
+        {
+            railUI.SetActive(enable);
+        }
+
+        public void SetWaterKeyframes()
+        {
+            keyframeContainer.sizeDelta = defaultKeyframeContainerSize;
+
+            //disable existing keyframes ui
+            ClearWaterKeyframes();
+
+            if (curWater == null)
+            {
+                return;
+            }
+
+            int resizeCount = 0;
+
+            for (int i = 0; i < curWater.keyframes.Count; i++)
+            {
+                if (i > maxWaterKeyframes)
+                {
+                    return;
+                }
+
+                GameObject keyframe = keyframeContainer.GetChild(i).gameObject;
+
+                InputField[] inputFields = keyframe.GetComponentsInChildren<InputField>();
+                inputFields[0].text = curWater.keyframes[i].time.ToString();
+                inputFields[1].text = curWater.keyframes[i].value.ToString();
+
+                keyframe.SetActive(true);
+
+                //resize container for scrollrect to properly scroll
+                if (i > 4)
+                {
+                    resizeCount++;
+                }
+            }
+
+            keyframeContainer.sizeDelta = new Vector2(keyframeContainer.sizeDelta.x, keyframeContainer.sizeDelta.y + (42*(resizeCount+1)));
+        }
+
+        private void ClearWaterKeyframes()
+        {
+            for (int i = 0; i < keyframeContainer.childCount; i++)
+            {
+                GameObject keyframe = keyframeContainer.GetChild(i).gameObject;
+
+                InputField[] inputFields = keyframe.GetComponentsInChildren<InputField>();
+                inputFields[0].text = "";
+                inputFields[1].text = "";
+
+                keyframe.SetActive(false);
+            }
+
+            keyframeContainer.sizeDelta = defaultKeyframeContainerSize;
+        }
+
+        public void SetRailInformation()
+        {
+            if (curRailNode == null)
+            {
+                return;
+            }
+
+            railPositionField[0].text = curRailNode.node.position.x.ToString();
+            railPositionField[1].text = curRailNode.node.position.y.ToString();
+            railPositionField[2].text = curRailNode.node.position.z.ToString();
+
+            railDirectionField[0].text = curRailNode.node.direction.x.ToString();
+            railDirectionField[1].text = curRailNode.node.direction.y.ToString();
+            railDirectionField[2].text = curRailNode.node.direction.z.ToString();
+
+            railUpField[0].text = curRailNode.node.up.x.ToString();
+            railUpField[1].text = curRailNode.node.up.y.ToString();
+            railUpField[2].text = curRailNode.node.up.z.ToString();
+        }
+
+        // When given button pressed, open respective blocks panel and disable other block panels that might be open. Disables/enables bottom UI bar.
+        private void AddWorldUIEvent(int buttonId)
+        {
+            worldButtons[buttonId].onClick.AddListener(delegate
+            {
+                OnWorldButton(buttonId);
             });
         }
 
         // When InputField text is submitted, apply position transform on currently selected objects based on text.
-        void AddPositionInputEvent(InputField inputField, int coordinate)
+        private void AddPositionInputEvent(InputField inputField, int coordinate)
         {
             inputField.onValueChanged.AddListener(delegate (string value)
             {
@@ -390,6 +906,13 @@ namespace SBM_CustomLevels
                 {
                     return;
                 }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                UndoManager.AddUndo(UndoManager.UndoType.Move, new List<EditorSelectable>(EditorManager.instance.curSelected));
 
                 foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
                 {
@@ -406,7 +929,7 @@ namespace SBM_CustomLevels
         }
 
         // When InputField text is submitted, apply rotation transform on currently selected objects based on text.
-        void AddRotationInputEvent(InputField inputField, int coordinate)
+        private void AddRotationInputEvent(InputField inputField, int coordinate)
         {
             inputField.onValueChanged.AddListener(delegate (string value)
             {
@@ -414,6 +937,13 @@ namespace SBM_CustomLevels
                 {
                     return;
                 }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                UndoManager.AddUndo(UndoManager.UndoType.Rotate, new List<EditorSelectable>(EditorManager.instance.curSelected));
 
                 foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
                 {
@@ -430,7 +960,7 @@ namespace SBM_CustomLevels
         }
 
         // When InputField text is submitted, apply scale transform on currently selected objects based on text.
-        void AddScaleInputEvent(InputField inputField, int coordinate)
+        private void AddScaleInputEvent(InputField inputField, int coordinate)
         {
             inputField.onValueChanged.AddListener(delegate (string value)
             {
@@ -438,6 +968,15 @@ namespace SBM_CustomLevels
                 {
                     return;
                 }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                UndoManager.AddUndo(UndoManager.UndoType.Scale, new List<EditorSelectable>(EditorManager.instance.curSelected));
+
+                Debug.Log("Scale Added!");
 
                 foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
                 {
@@ -468,17 +1007,9 @@ namespace SBM_CustomLevels
         }
 
         //reset editor when UI is closed (when scene is left)
-        void OnDestroy()
+        private void OnDestroy()
         {
             EditorManager.instance.ResetEditor();
-        }
-
-        /// Adds a RawImageUVScroll component to the object.
-        private void AddUVScroll(GameObject gameObject, float scrollSpeed)
-        {
-            RawImageUVScroll uvScroll = gameObject.AddComponent<RawImageUVScroll>();
-            uvScroll.targetScrollSpeed.x = scrollSpeed;
-            uvScroll.scrollEnabled = true;
         }
 
         public void SetInspectorName(string name, bool multiple)

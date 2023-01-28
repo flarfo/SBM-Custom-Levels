@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using SplineMesh;
 using System.IO;
 using System.Collections.Generic;
 using UnityEngine.EventSystems;
@@ -11,9 +12,16 @@ namespace SBM_CustomLevels
     {
         public static EditorManager instance;
 
+        public static Material outlineMask;
+        public static Material outlineFill;
+
+        public static GameObject fakeWater;
+        public static GameObject iceSledSpikesGuide;
+        public static GameObject playerSpawn;
+
         public GameObject background;
 
-        private static bool inEditor = false;
+        public static bool inEditor = false;
 
         public string selectedLevel;
 
@@ -34,6 +42,7 @@ namespace SBM_CustomLevels
         public static Mesh defaultCube;
 
         private GameObject carrot;
+
         public GameObject Carrot 
         {
             get
@@ -49,6 +58,8 @@ namespace SBM_CustomLevels
         }
 
         public GameObject wormhole;
+        public GameObject spawn1;
+        public GameObject spawn2;
 
         public static bool InEditor 
         {
@@ -64,13 +75,9 @@ namespace SBM_CustomLevels
             } 
         }
 
-        public Material outlineMask;
-        public Material outlineFill;
-
         //currently selected objects
         public List<EditorSelectable> curSelected = new List<EditorSelectable>();
         public List<EditorSelectable> copiedObjects = new List<EditorSelectable>();
-
 
         private void Awake()
         {
@@ -84,27 +91,12 @@ namespace SBM_CustomLevels
                 Destroy(this);
             }
 
-            //load materials
-            AssetBundle loadedBundle = LevelLoader_Mod.GetAssetBundleFromResources("sbm-bundle");
-
-            //materials used for EditorSelectable outlines
-            outlineMask = loadedBundle.LoadAsset<Material>("OutlineMask");
-            outlineFill = loadedBundle.LoadAsset<Material>("OutlineFill");
-
-            loadedBundle.Unload(false);
-
             defaultCube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
         }
 
         private void Update()
         {
             if (!inEditor)
-            {
-                return;
-            }
-
-            //if pointer is over UI, no need to check 3D world for input
-            if (EventSystem.current.IsPointerOverGameObject())
             {
                 return;
             }
@@ -116,7 +108,8 @@ namespace SBM_CustomLevels
                 ctrlClicked = true;
             }
 
-            if (Input.GetKeyDown(KeyCode.C) && ctrlClicked) //copy objects
+            // copy
+            if (Input.GetKeyDown(KeyCode.C) && ctrlClicked)
             {
                 foreach (EditorSelectable editorSelectable in copiedObjects)
                 {
@@ -129,7 +122,7 @@ namespace SBM_CustomLevels
                 {
                     if (editorSelectable.gameObject.name.Contains("Wormhole") || editorSelectable.gameObject.name.Contains("Carrot"))
                     {
-                        continue; //dont copy paste wormhole or carrot (should only be one of each)
+                        continue; // dont copy paste wormhole or carrot (should only be one of each)
                     }
 
                     EditorSelectable newObject = Instantiate(editorSelectable);
@@ -138,7 +131,8 @@ namespace SBM_CustomLevels
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.V) && ctrlClicked) //paste objects
+            // paste
+            if (Input.GetKeyDown(KeyCode.V) && ctrlClicked)
             {
                 if (copiedObjects.Count > 0)
                 {
@@ -161,10 +155,13 @@ namespace SBM_CustomLevels
 
                         curSelected.Add(newObject);
                     }
+
+                    UndoManager.AddUndo(UndoManager.UndoType.Place, new List<EditorSelectable>(curSelected));
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.X) && ctrlClicked) //cut objects
+            // cut
+            if (Input.GetKeyDown(KeyCode.X) && ctrlClicked)
             {
                 foreach (EditorSelectable editorSelectable in copiedObjects)
                 {
@@ -179,9 +176,10 @@ namespace SBM_CustomLevels
                     copiedObjects.Add(newObject);
                     newObject.gameObject.SetActive(false);
 
-                    Destroy(editorSelectable.gameObject);
+                    editorSelectable.gameObject.SetActive(false);
                 }
 
+                UndoManager.AddUndo(UndoManager.UndoType.Delete, new List<EditorSelectable>(curSelected));
                 curSelected.Clear();
             }
 
@@ -190,6 +188,19 @@ namespace SBM_CustomLevels
                 mouseUp = true;
             }
 
+            // undo
+            if (Input.GetKeyDown(KeyCode.Z) && ctrlClicked) 
+            {
+                UndoManager.Undo();
+            }
+
+            // redo
+            if (Input.GetKeyDown(KeyCode.Y) && ctrlClicked)
+            {
+                UndoManager.Redo(); 
+            }
+
+            // save
             if (Input.GetKeyDown(KeyCode.S) && ctrlClicked)
             {
                 RecordLevel.RecordJSONLevel();
@@ -198,19 +209,47 @@ namespace SBM_CustomLevels
                 EditorUI.instance.lastSavedText.text = "Saved: " + DateTime.Now.ToString("HH:mm");
             }
 
+            // delete
             if (Input.GetKeyDown(KeyCode.Delete))
             {
-                foreach (EditorSelectable editorSelectable in curSelected)
+                if (curSelected.Count == 0)
                 {
-                    Destroy(editorSelectable.gameObject);
+                    return;
                 }
 
+                List<EditorSelectable> deletedObjects = new List<EditorSelectable>();
+
+                foreach (EditorSelectable editorSelectable in curSelected)
+                {
+                    // dont delete rail nodes, this should be managed by the minecart rail ui
+                    if (editorSelectable.gameObject.name == "Node")
+                    {
+                        editorSelectable.Selected = false;
+                        continue;
+                    }
+
+                    editorSelectable.gameObject.SetActive(false);
+                    deletedObjects.Add(editorSelectable);
+                }
+
+                UndoManager.AddUndo(UndoManager.UndoType.Delete, deletedObjects);
                 curSelected.Clear();
+            }
+
+            //if pointer is over UI, no need to check 3D world for input
+            if (EventSystem.current.IsPointerOverGameObject())
+            {
+                return;
             }
 
             //selects object under mouse when select tool is active
             if (Input.GetKeyDown(KeyCode.Mouse0))
             {
+                if (mouseUp && moveTool && curSelected.Count > 0)
+                {
+                    UndoManager.AddUndo(UndoManager.UndoType.Move, new List<EditorSelectable>(curSelected));
+                }
+
                 if (selectTool)
                 {
                     SelectObject(ctrlClicked);
@@ -240,7 +279,7 @@ namespace SBM_CustomLevels
             {
                 EditorSelectable hitSelectable;
 
-                if (hit.collider.transform.root)
+                if (hit.collider.transform.root && hit.collider.gameObject.name != "Node")
                 {
                     hitSelectable = hit.collider.transform.root.GetComponent<EditorSelectable>();
                 }
@@ -249,9 +288,21 @@ namespace SBM_CustomLevels
                     hitSelectable = hit.collider.GetComponent<EditorSelectable>();
                 }
                  
-
+                //check if water/minecart to enable custom UI
                 if (hitSelectable)
                 {
+                    bool activateWaterUI = false;
+                    bool activateRailUI = false;
+
+                    if (hitSelectable.GetComponent<FakeWater>())
+                    {
+                        activateWaterUI = true;
+                    }
+                    else if (hitSelectable.GetComponent<MinecartRailNode>())
+                    {
+                        activateRailUI = true;
+                    }
+
                     //if control pressed, already selected objects will be deselected, nonselected objects will be appened to selection
                     if (ctrlClicked)
                     {
@@ -259,6 +310,18 @@ namespace SBM_CustomLevels
                         {
                             curSelected.Remove(hitSelectable);
                             hitSelectable.Selected = false;
+
+                            if (curSelected.Count == 0)
+                            {
+                                EditorUI.instance.EnableInspector(false);
+                                EditorUI.instance.EnableWaterUI(false);
+                                EditorUI.instance.EnableRailUI(false);
+
+                                EditorUI.instance.curWater = null;
+                                EditorUI.instance.curRailNode = null;
+
+                                return;
+                            }
                         }
                         else
                         {
@@ -266,6 +329,20 @@ namespace SBM_CustomLevels
                             hitSelectable.Selected = true;
                         }
 
+                        if (activateWaterUI)
+                        {
+                            EditorUI.instance.curWater = hitSelectable.GetComponent<FakeWater>();
+                            EditorUI.instance.SetWaterKeyframes();
+                            EditorUI.instance.EnableWaterUI(true);
+                        }
+
+                        if (activateRailUI)
+                        {
+                            EditorUI.instance.curRailNode = hitSelectable.GetComponent<MinecartRailNode>();
+                            EditorUI.instance.SetRailInformation();
+                            EditorUI.instance.EnableRailUI(true);
+                        }
+                        
                         return;
                     }
 
@@ -280,6 +357,30 @@ namespace SBM_CustomLevels
                         curSelected = new List<EditorSelectable>() { hitSelectable };
                         hitSelectable.Selected = true;
                     }
+
+                    if (activateWaterUI)
+                    {
+                        EditorUI.instance.curWater = hitSelectable.GetComponent<FakeWater>();
+                        EditorUI.instance.SetWaterKeyframes();
+                    }
+                    else
+                    {
+                        EditorUI.instance.curWater = null;
+                    }
+
+                    if (activateRailUI)
+                    {
+                        EditorUI.instance.curRailNode = hitSelectable.GetComponent<MinecartRailNode>();
+                        EditorUI.instance.SetRailInformation();
+                    }
+                    else
+                    {
+                        EditorUI.instance.curRailNode = null;
+                    }
+
+                    EditorUI.instance.EnableInspector(true);
+                    EditorUI.instance.EnableWaterUI(activateWaterUI);
+                    EditorUI.instance.EnableRailUI(activateRailUI);
                 }
             }
         }
@@ -288,6 +389,7 @@ namespace SBM_CustomLevels
         {
             foreach (EditorSelectable selectable in curSelected)
             {
+                // add selectables to undo stack
                 if (mouseUp)
                 {
                     selectable.SetMouseOffset();
@@ -296,6 +398,11 @@ namespace SBM_CustomLevels
                 selectable.MoveObject(snapVector);
 
                 selectable.SetInspectorInfo();
+            }
+
+            if (EditorUI.instance.curRailNode)
+            {
+                EditorUI.instance.SetRailInformation();
             }
 
             //mouseup makes sure setmouseoffset isnt constantly running, making objects not move
@@ -308,7 +415,6 @@ namespace SBM_CustomLevels
         public void SetSnapX(float snapX)
         {
             snapVector.x = snapX;
-            
         }
 
         public void SetSnapY(float snapY)
@@ -319,8 +425,11 @@ namespace SBM_CustomLevels
         //resets editor so data doesnt carry over into new editor instances
         public void ResetEditor()
         {
-            Debug.LogError("Editor reset!");
+            Debug.Log("Editor reset!");
+            InEditor = false;
             wormhole = null;
+            spawn1 = null;
+            spawn2 = null;
             selectedLevel = null;
             curSelected = new List<EditorSelectable>();
             copiedObjects = new List<EditorSelectable>();
@@ -331,6 +440,8 @@ namespace SBM_CustomLevels
             mouseUp = false;
             background = null;
             worldStyle = 1;
+
+            UndoManager.Reset();
         }
 
         //loads EXISTING level in editor mode
@@ -348,7 +459,11 @@ namespace SBM_CustomLevels
                 return;
             }
 
-            string rawText = File.ReadAllText(path).Remove(0, 1);
+            string rawText = File.ReadAllText(path);
+            instance.worldStyle = (int)char.GetNumericValue(rawText[0]);
+            rawText = rawText.Remove(0, 1);
+
+            LevelManager.instance.CreateBackground(instance.worldStyle, true);
 
             ObjectContainer json = JsonConvert.DeserializeObject<ObjectContainer>(rawText);
 
@@ -359,8 +474,27 @@ namespace SBM_CustomLevels
             {
                 GameObject loadedObject;
 
-                loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                if (defaultObject.objectName == "prefabs\\level\\world2\\IceSledSpikesGuide")
+                {
+                    loadedObject = Instantiate(iceSledSpikesGuide, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                }
+                else
+                {
+                    loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                }
+                
                 loadedObject.transform.localScale = defaultObject.GetScale();
+
+                if (defaultObject.objectName == "prefabs\\level\\Carrot")
+                {
+                    instance.Carrot = loadedObject;
+                }
+                else if (defaultObject.objectName == "prefabs\\level\\Wormhole")
+                {
+                    instance.wormhole = loadedObject;
+                }
+
+                AddColliderToObject(loadedObject);
 
                 loadedObject.AddComponent<Outline>();
                 loadedObject.AddComponent<EditorSelectable>();
@@ -375,23 +509,46 @@ namespace SBM_CustomLevels
             {
                 GameObject loadedObject;
 
-                loadedObject = Instantiate(LevelLoader_Mod.fakeWater, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation()));
+                loadedObject = Instantiate(EditorManager.fakeWater, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation()));
 
                 loadedObject.transform.localScale = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1);
+
+                Debug.Log(loadedObject.transform.localScale.ToString("F4"));
 
                 FakeWater fakeWater = loadedObject.GetComponent<FakeWater>();
                 fakeWater.width = waterObject.waterWidth;
                 fakeWater.height = waterObject.waterHeight;
+                fakeWater.keyframes = waterObject.keyframes;
 
                 loadedObject.AddComponent<Outline>();
                 loadedObject.AddComponent<EditorSelectable>();
             }
 
-            GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
-            playerSpawn_1.transform.position = spawnPos_1;
+            foreach (RailObject railObject in json.railObjects)
+            {
+                GameObject loadedObject = MinecartRailHelper.CreateRailFromObject(railObject, true);
 
-            GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
+                loadedObject.AddComponent<Outline>();
+                loadedObject.AddComponent<EditorSelectable>();
+            }
+
+            GameObject playerSpawn_1 = Instantiate(playerSpawn);
+            playerSpawn_1.name = "PlayerSpawn_1";
+            playerSpawn_1.transform.position = spawnPos_1;
+            playerSpawn_1.transform.localScale = new Vector3(1, 2, 1);
+            playerSpawn_1.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+            playerSpawn_1.AddComponent<Outline>();
+            playerSpawn_1.AddComponent<EditorSelectable>();
+            instance.spawn1 = playerSpawn_1;
+
+            GameObject playerSpawn_2 = Instantiate(playerSpawn);
+            playerSpawn_2.name = "PlayerSpawn_2";
             playerSpawn_2.transform.position = spawnPos_2;
+            playerSpawn_2.transform.localScale = new Vector3(1, 2, 1);
+            playerSpawn_2.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+            playerSpawn_2.AddComponent<Outline>();
+            playerSpawn_2.AddComponent<EditorSelectable>();
+            instance.spawn2 = playerSpawn_2;
         }
 
         //creates a new base level in editor mode
@@ -399,19 +556,23 @@ namespace SBM_CustomLevels
         {
             InEditor = true;
 
-            GameObject carrot = Instantiate(Resources.Load(Path.Combine("prefabs", "level", "Carrot"))) as GameObject;
-            carrot.AddComponent<Outline>();
-            carrot.AddComponent<EditorSelectable>();
+            GameObject playerSpawn_1 = Instantiate(playerSpawn);
+            playerSpawn_1.name = "PlayerSpawn_1";
+            playerSpawn_1.transform.position = new Vector3(0,0,0);
+            playerSpawn_1.transform.localScale = new Vector3(1, 2, 1);
+            playerSpawn_1.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+            playerSpawn_1.AddComponent<Outline>();
+            playerSpawn_1.AddComponent<EditorSelectable>();
+            instance.spawn1 = playerSpawn_1;
 
-            GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
-            playerSpawn_1.transform.position = new Vector3(0, 0, 0);
-
-            GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
-            playerSpawn_2.transform.position = new Vector3(0.5f, 0, 0);
-
-            /*SBM.Objects.Common.Cloud.CloudSpawner cloudSpawner = Instantiate(Resources.Load("prefabs/level/Cloud Spawner") as GameObject).GetComponent<SBM.Objects.Common.Cloud.CloudSpawner>();
-            cloudSpawner.CloudPrefabs.Clear();
-            cloudSpawner.CloudPrefabs.Add(Resources.Load("prefabs/level/world1/Cloud_W1") as GameObject);*/
+            GameObject playerSpawn_2 = Instantiate(playerSpawn);
+            playerSpawn_2.name = "PlayerSpawn_2";
+            playerSpawn_2.transform.position = new Vector3(1, 0, 0);
+            playerSpawn_2.transform.localScale = new Vector3(1, 2, 1);
+            playerSpawn_2.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+            playerSpawn_2.AddComponent<Outline>();
+            playerSpawn_2.AddComponent<EditorSelectable>();
+            instance.spawn2 = playerSpawn_2;
         }
 
         public void InitializeEditor()
@@ -419,8 +580,9 @@ namespace SBM_CustomLevels
             //create editor ui
             AssetBundle loadedBundle = LevelLoader_Mod.GetAssetBundleFromResources("ui-bundle");
 
-            editorUI = Instantiate(loadedBundle.LoadAsset<GameObject>("EditorUI"));
+            EditorUI.keyframeUI = loadedBundle.LoadAsset<GameObject>("Keyframe");
 
+            editorUI = Instantiate(loadedBundle.LoadAsset<GameObject>("EditorUI"));
             editorUI.AddComponent<EditorUI>();
 
             loadedBundle.Unload(false);
@@ -441,6 +603,400 @@ namespace SBM_CustomLevels
                 Cursor.lockState = CursorLockMode.Locked;
             }
             
+        }
+
+        public static void AddColliderToObject(GameObject go)
+        {
+            //ensure that a spawned object has some form of collider to detect raycast (mouse click) for selection
+            if (go.TryGetComponent(out MeshCollider meshCollider))
+            {
+                meshCollider.enabled = true;
+            }
+            else if (go.GetComponent<Collider>())
+            {
+
+            }
+            else if (!go.GetComponent<Collider>() && go.GetComponent<MeshFilter>())
+            {
+                go.AddComponent<MeshCollider>();
+            }
+            else
+            {
+                MeshCollider[] meshColliders = go.GetComponentsInChildren<MeshCollider>();
+
+                if (meshColliders.Length != 0)
+                {
+                    foreach (MeshCollider collider in meshColliders)
+                    {
+                        collider.enabled = true;
+                    }
+                }
+                else
+                {
+                    MeshFilter[] meshFilters = go.GetComponentsInChildren<MeshFilter>();
+
+                    if (meshFilters.Length != 0)
+                    {
+                        foreach (MeshFilter filter in meshFilters)
+                        {
+                            filter.gameObject.AddComponent<MeshCollider>();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public static class UndoManager
+    {
+        private static Stack<UndoStruct> undoStack = new Stack<UndoStruct>();
+        private static Stack<UndoStruct> redoStack = new Stack<UndoStruct>();
+
+        public enum UndoType
+        {
+            Place,
+            Delete,
+            Move,
+            Rotate,
+            Scale,
+            AddRailNode,
+            DeleteRailNode
+        }
+
+        #region Undo
+        /// <summary>
+        /// Adds an undo event to the top of the undo stack.
+        /// </summary
+        public static void AddUndo(UndoType undoType, List<EditorSelectable> editorObjects, bool wasRedo = false, MinecartRailNode railNode = null)
+        {
+            if (!wasRedo)
+            {
+                redoStack.Clear(); // clear redo stack after a new action is performed
+            }
+
+            UndoStruct undo = new UndoStruct();
+            undo.undoType = undoType;
+            undo.undoObjects = new List<UndoObject>();
+            undo.editorObjects = editorObjects;
+            
+            if (railNode)
+            {
+                undo.railNode = railNode;
+                Debug.Log(railNode.railSpline.nodes.Count);
+                undo.railNodeIndex = railNode.railSpline.nodes.IndexOf(railNode.node);
+            }
+
+            for (int i = 0; i < editorObjects.Count; i++)
+            {
+                UndoObject undoObject = new UndoObject();
+
+                undoObject.position = editorObjects[i].gameObject.transform.position;
+                undoObject.rotation = editorObjects[i].gameObject.transform.rotation.eulerAngles;
+                undoObject.scale = editorObjects[i].gameObject.transform.localScale;
+
+                undo.undoObjects.Add(undoObject);
+            }
+
+            undoStack.Push(undo);
+        }
+
+        /// <summary>
+        /// Undoes the event at the top of the undo stack.
+        /// </summary
+        public static void Undo()
+        {
+            if (undoStack.Count == 0)
+            {
+                Debug.Log("Nothing to undo.");
+                return;
+            }
+
+            UndoStruct undo = undoStack.Pop();
+
+            switch (undo.undoType)
+            {
+                case UndoType.Place:
+                    UndoPlace(undo);
+                    break;
+                case UndoType.Delete:
+                    UndoDelete(undo);
+                    break;
+                case UndoType.Move:
+                    UndoMove(undo);
+                    break;
+                case UndoType.Rotate:
+                    UndoRotate(undo);
+                    break;
+                case UndoType.Scale:
+                    UndoScale(undo);
+                    break;
+                case UndoType.AddRailNode:
+                    UndoAddRailNode(undo);
+                    break;
+                case UndoType.DeleteRailNode:
+                    UndoDeleteRailNode(undo);
+                    break;
+            }
+        }
+
+        private static void UndoPlace(UndoStruct undo)
+        {
+            AddRedo(UndoType.Place, new List<EditorSelectable>(undo.editorObjects));
+
+            foreach (EditorSelectable editorObject in undo.editorObjects)
+            {
+                editorObject.gameObject.SetActive(false);
+                EditorManager.instance.curSelected.Remove(editorObject);
+            }
+        }
+
+        private static void UndoDelete(UndoStruct undo)
+        {
+            AddRedo(UndoType.Delete, new List<EditorSelectable>(undo.editorObjects));
+
+            foreach (EditorSelectable editorObject in undo.editorObjects)
+            {
+                editorObject.gameObject.SetActive(true);
+            }
+        }
+
+        private static void UndoMove(UndoStruct undo)
+        {
+            AddRedo(UndoType.Move, new List<EditorSelectable>(undo.editorObjects));
+
+            int i = 0;
+            foreach (EditorSelectable editorObject in undo.editorObjects)
+            {
+                editorObject.transform.position = undo.undoObjects[i].position;
+                i++;
+            }
+        }
+
+        private static void UndoRotate(UndoStruct undo)
+        {
+            AddRedo(UndoType.Rotate, new List<EditorSelectable>(undo.editorObjects));
+
+            int i = 0;
+            foreach (EditorSelectable editorObject in undo.editorObjects)
+            {
+                editorObject.transform.rotation = Quaternion.Euler(undo.undoObjects[i].rotation);
+                i++;
+            }
+        }
+
+        private static void UndoScale(UndoStruct undo)
+        {
+            AddRedo(UndoType.Scale, new List<EditorSelectable>(undo.editorObjects));
+
+            int i = 0;
+            foreach (EditorSelectable editorObject in undo.editorObjects)
+            {
+                editorObject.transform.localScale = undo.undoObjects[i].scale;
+                i++;
+            }
+        }
+
+        private static void UndoAddRailNode(UndoStruct undo)
+        {
+            AddRedo(UndoType.AddRailNode, new List<EditorSelectable>(undo.editorObjects), undo.railNode);
+
+            undo.railNode.gameObject.SetActive(false);
+            undo.railNode.railSpline.RemoveNode(undo.railNode.node);
+        }
+
+        /// <summary>
+        /// Undoes the deletion of a MinecartRailNode to the spline.
+        /// The MinecartRailNode must be index 0 in the UndoStruct.editorObjects for this to work properly.
+        /// </summary>
+        private static void UndoDeleteRailNode(UndoStruct undo)
+        {
+            // spline cannot have fewer than two nodes
+            if (undo.railNode.railSpline.nodes.Count > 2)
+            {
+                AddRedo(UndoType.DeleteRailNode, new List<EditorSelectable>(undo.editorObjects), undo.railNode);
+
+                undo.railNode.gameObject.SetActive(true);
+                undo.railNode.railSpline.InsertNode(undo.railNodeIndex, undo.railNode.node);
+            }
+        }
+        #endregion
+
+        #region Redo
+        /// <summary>
+        /// Adds a redo event to the top of the redo stack.
+        /// If the object is to be destroyed, call this method BEFORE the destruction.
+        /// </summary
+        private static void AddRedo(UndoType undoType, List<EditorSelectable> editorObjects, MinecartRailNode railNode = null)
+        {
+            UndoStruct redo = new UndoStruct();
+            redo.undoType = undoType;
+            redo.undoObjects = new List<UndoObject>();
+            redo.editorObjects = editorObjects;
+
+            if (railNode)
+            {
+                redo.railNode = railNode;
+                redo.railNodeIndex = railNode.railSpline.nodes.IndexOf(railNode.node);
+            }
+
+            for (int i = 0; i < editorObjects.Count; i++)
+            {
+                UndoObject redoObject = new UndoObject();
+
+                redoObject.position = editorObjects[i].gameObject.transform.position;
+                redoObject.rotation = editorObjects[i].gameObject.transform.rotation.eulerAngles;
+                redoObject.scale = editorObjects[i].gameObject.transform.localScale;
+
+                redo.undoObjects.Add(redoObject);
+            }
+
+            redoStack.Push(redo);
+        }
+
+        /// <summary>
+        /// Redoes the event at the top of the redo stack.
+        /// </summary
+        public static void Redo()
+        {
+            if (redoStack.Count == 0)
+            {
+                Debug.Log("Nothing to redo.");
+                return;
+            }
+
+            UndoStruct redo = redoStack.Pop();
+
+            switch (redo.undoType)
+            {
+                case UndoType.Place:
+                    RedoPlace(redo);
+                    break;
+                case UndoType.Delete:
+                    RedoDelete(redo);
+                    break;
+                case UndoType.Move:
+                    RedoMove(redo);
+                    break;
+                case UndoType.Rotate:
+                    RedoRotate(redo);
+                    break;
+                case UndoType.Scale:
+                    RedoScale(redo);
+                    break;
+                case UndoType.AddRailNode:
+                    RedoAddRailNode(redo);
+                    break;
+                case UndoType.DeleteRailNode:
+                    RedoDeleteRailNode(redo);
+                    break;
+            }
+        }
+
+        private static void RedoPlace(UndoStruct redo)
+        {
+            AddUndo(UndoType.Place, new List<EditorSelectable>(redo.editorObjects), true);
+
+            foreach (EditorSelectable editorObject in redo.editorObjects)
+            {
+                editorObject.gameObject.SetActive(true);
+            }
+
+            Debug.Log(EditorManager.instance.curSelected.Count);
+        }
+
+        private static void RedoDelete(UndoStruct redo)
+        {
+            AddUndo(UndoType.Delete, new List<EditorSelectable>(redo.editorObjects), true);
+
+            foreach (EditorSelectable editorObject in redo.editorObjects)
+            {
+                editorObject.gameObject.SetActive(false);
+                EditorManager.instance.curSelected.Remove(editorObject);
+            }
+        }
+
+        private static void RedoMove(UndoStruct redo)
+        {
+            AddUndo(UndoType.Move, new List<EditorSelectable>(redo.editorObjects), true);
+
+            int i = 0;
+            foreach (EditorSelectable editorObject in redo.editorObjects)
+            {
+                editorObject.transform.position = redo.undoObjects[i].position;
+                i++;
+            }
+        }
+
+        private static void RedoRotate(UndoStruct redo)
+        {
+            AddUndo(UndoType.Rotate, new List<EditorSelectable>(redo.editorObjects), true);
+
+            int i = 0;
+            foreach (EditorSelectable editorObject in redo.editorObjects)
+            {
+                editorObject.transform.rotation = Quaternion.Euler(redo.undoObjects[i].rotation);
+                i++;
+            }
+        }
+
+        private static void RedoScale(UndoStruct redo)
+        {
+            AddUndo(UndoType.Scale, new List<EditorSelectable>(redo.editorObjects), true);
+
+            int i = 0;
+            foreach (EditorSelectable editorObject in redo.editorObjects)
+            {
+                editorObject.transform.localScale = redo.undoObjects[i].scale;
+                i++;
+            }
+        }
+
+        private static void RedoAddRailNode(UndoStruct redo)
+        {
+            // spline cannot have fewer than two nodes
+            if (redo.railNode.railSpline.nodes.Count > 2)
+            {
+                AddUndo(UndoType.AddRailNode, new List<EditorSelectable>(redo.editorObjects), true, redo.railNode);
+
+                redo.railNode.gameObject.SetActive(true);
+                redo.railNode.railSpline.InsertNode(redo.railNodeIndex, redo.railNode.node);
+            }
+        }
+
+        private static void RedoDeleteRailNode(UndoStruct redo)
+        {
+            AddUndo(UndoType.DeleteRailNode, new List<EditorSelectable>(redo.editorObjects), true, redo.railNode);
+
+            redo.railNode.gameObject.SetActive(false);
+            redo.railNode.railSpline.RemoveNode(redo.railNode.node);
+        }
+        #endregion
+
+        /// <summary>
+        /// Clears all data stored in the UndoManager.
+        /// </summary>
+        public static void Reset()
+        {
+            undoStack.Clear();
+            redoStack.Clear();
+        }
+
+        public struct UndoStruct
+        {
+            public UndoType undoType;
+            public List<EditorSelectable> editorObjects;
+            public List<UndoObject> undoObjects;
+
+            // minecart raile specific, can be ignored otherwise
+            public MinecartRailNode railNode;
+            public int railNodeIndex;
+        }
+
+        public struct UndoObject
+        {
+            public Vector3 position;
+            public Vector3 rotation;
+            public Vector3 scale;
         }
     }
 }

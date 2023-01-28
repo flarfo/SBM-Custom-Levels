@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Linq;
 using System.Collections.Generic;
+using System.Collections;
 using System;
 
 namespace SBM_CustomLevels
@@ -28,7 +29,7 @@ namespace SBM_CustomLevels
         public static Material skyboxWorld3;
         public static Material skyboxWorld4;
 
-        public static GameObject fakeWater;
+        public static Material colliderRenderMat;
 
         //initialize plugin and start harmony
         private void Awake()
@@ -62,8 +63,17 @@ namespace SBM_CustomLevels
             skyboxWorld3 = sbmBundle.LoadAsset<Material>("Skybox_World3");
             skyboxWorld4 = sbmBundle.LoadAsset<Material>("Skybox_World4");
 
-            fakeWater = sbmBundle.LoadAsset<GameObject>("Water");
-            fakeWater.AddComponent<FakeWater>();
+            EditorManager.fakeWater = sbmBundle.LoadAsset<GameObject>("Water");
+            EditorManager.fakeWater.AddComponent<FakeWater>();
+
+            EditorManager.iceSledSpikesGuide = sbmBundle.LoadAsset<GameObject>("IceSledSpikesGuide");
+            EditorManager.playerSpawn = sbmBundle.LoadAsset<GameObject>("PlayerSpawn");
+
+            EditorManager.outlineMask = sbmBundle.LoadAsset<Material>("OutlineMask");
+            EditorManager.outlineFill = sbmBundle.LoadAsset<Material>("OutlineFill");
+
+            MinecartRailHelper.railSplineTile = sbmBundle.LoadAsset<Mesh>("RailSplineTIle");
+            MinecartRailHelper.railMaterial = sbmBundle.LoadAsset<Material>("MinecartRail");
         }
         
         public static void UpdateWorldsList()

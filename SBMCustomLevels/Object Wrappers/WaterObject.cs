@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
 
@@ -9,6 +10,8 @@ namespace SBM_CustomLevels
     {
         public float waterHeight;
         public float waterWidth;
+
+        public List<Keyframe> keyframes;
 
         [JsonConstructor]
         public WaterObject()
@@ -22,6 +25,8 @@ namespace SBM_CustomLevels
 
             waterHeight = fakeWater.height;
             waterWidth = fakeWater.width;
+
+            keyframes = fakeWater.keyframes;
         }
     }
 }

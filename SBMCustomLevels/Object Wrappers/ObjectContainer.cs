@@ -12,6 +12,7 @@ namespace SBM_CustomLevels
 
         public List<DefaultObject> defaultObjects;
         public List<WaterObject> waterObjects;
+        public List<RailObject> railObjects;
 
         [JsonConstructor]
         public ObjectContainer()
@@ -19,12 +20,13 @@ namespace SBM_CustomLevels
 
         }
 
-        public ObjectContainer(FloatObject pos1, FloatObject pos2, List<DefaultObject> _defaultObjects, List<WaterObject> _waterObjects)
+        public ObjectContainer(FloatObject pos1, FloatObject pos2, List<DefaultObject> _defaultObjects, List<WaterObject> _waterObjects, List<RailObject> _railObjects)
         {
             spawnPosition1 = pos1;
             spawnPosition2 = pos2;
             defaultObjects = _defaultObjects;
             waterObjects = _waterObjects;
+            railObjects = _railObjects;
         }
     }
 }
