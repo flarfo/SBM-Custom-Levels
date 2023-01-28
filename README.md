@@ -38,7 +38,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 
 | Object | Name | Description |
 :-------------:|:-------------:|:-----:
-col 3 is | Block_W1 | $1600 |
+![]icon/Block_W1.png | Block_W1 | $1600 |
 col 2 is | centered | $12
 zebra stripes | are neat |  $1
 
