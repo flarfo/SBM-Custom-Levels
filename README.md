@@ -37,25 +37,25 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ## Editor Information
 
 ### Options Menu
-| Object | Name | Description |
+| Object | Name | Notes |
 :-------------:|:-------------:|:-----:
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Carrot.png) | Carrot |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Wormhole.png) | Wormhole | Exit to the level, REQUIRED.
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Carrot.png) | Carrot | REQUIRED.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/EasterEgg.png) | EasterEgg |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/KillBounds.png) | KillBounds |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/KillBounds.png) | KillBounds | Kills player on collision.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/PlayerSpawn.png) | PlayerSpawn |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Signpost_Arrow.png) | Signpost_Arrow |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Signpost_Death.png) | Signpost_Death |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Spikes.png) | Spikes |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/SpringBoard.png) | SpringBoard |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WaterFoam_B.png) | World4_BG |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World3_BG.png) | World3_BG |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World5_BG.png) | World5_BG |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WorldBG_1.png) | WorldBG_1 |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World_2_BG.png) | World_2_BG |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Wormhole.png) | Wormhole |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World3_BG.png) | World3_BG |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WaterFoam_B.png) | World4_BG |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World5_BG.png) | World5_BG |
 
 ### World 1
-| Object | Name | Description |
+| Object | Name | Notes |
 :-------------:|:-------------:|:-----:
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Block_W1.png) | Block_W1 |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Block_W1_1x1Beveled.png) | Block_W1_1x1Beveled |
@@ -84,7 +84,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Tree_Static.png) | Tree_Static |
 
 ### World 2
-| Object | Name | Description |
+| Object | Name | Notes |
 :-------------:|:-------------:|:-----:
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Block_W2.png) | Block_W2 |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Block_W2_Corner.png) | Block_W2_Corner |
@@ -110,6 +110,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/IceSled_1x3.png) | IceSled_1x3 |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/IceSled_1x4.png) | IceSled_1x4 |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/IceSled_1x5.png) | IceSled_1x5 |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/IceSledSpikesGuide.png) | IceSledSpikesGuide | Goes around spikes to allow ice sleds to slide smoothly across.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Signpost_Arrow_Snow.png) | Signpost_Arrow_Snow |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Signpost_Death_Snow.png) | Signpost_Death_Snow |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Snowball.png) | Snowball |
@@ -125,20 +126,18 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Snow_Single_1x1.png) | Snow_Single_1x1 |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WinterPlant.png) | WinterPlant |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WinterTree.png) | WinterTree |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World_2_BG.png) | World_2_BG |
 
 ### World 3
-| Object | Name | Description |
+| Object | Name | Notes |
 :-------------:|:-------------:|:-----:
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Block_W3.png) | Block_W3 |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Block_W3_Corner.png) | Block_W3_Corner |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Boulder.png) | Boulder |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderDestroyer.png) | BoulderDestroyer |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderDestroyer.png) | BoulderDestroyer | Destroys boulders on collision.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderRollable.png) | BoulderRollable |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderRollable.png.png) | BoulderRollable |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderSpawner.png) | BoulderSpawner |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderSpawner.png) | BoulderSpawner | Periodically spawns boulders.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Boulder_Kickable.png) | Boulder_Kickable |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Boulder_Spawned.png) | Boulder_Spawned |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/CaveRock.png) | CaveRock |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/CaveRockCrystals.png) | CaveRockCrystals |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/CaveRock_small.png) | CaveRock_small |
@@ -150,7 +149,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Crystal_Green.png) | Crystal_Green |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Crystal_Orange.png) | Crystal_Orange |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Crystal_Red.png) | Crystal_Red |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Minecart.png) | Minecart |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Minecart.png) | Minecart | Must be placed near minecart rail to connect.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/MinecartRail.png) | MinecartRail |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Minecart_Static.png) | Minecart_Static |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/MineLamp.png) | MineLamp |
@@ -162,7 +161,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World3_Block_1x1_Bevel.png) | World3_Block_1x1_Bevel |
 
 ### World 4
-| Object | Name | Description |
+| Object | Name | Notes |
 :-------------:|:-------------:|:-----:
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BarrelRaftIsland_LShape_A.png) | BarrelRaftIsland_LShape_A |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BarrelRaftIsland_LShape_B.png) | BarrelRaftIsland_LShape_B |
@@ -201,9 +200,10 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Seashell.png) | Seashell |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Seaweed.png) | Seaweed |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/TreasureChest.png) | TreasureChest |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Water.png) | Water | Can be configured to rise/fall.
 
 ### World 5
-| Object | Name | Description |
+| Object | Name | Notes |
 :-------------:|:-------------:|:-----:
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Billboard.png) | Billboard |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BumperBar.png) | BumperBar |
