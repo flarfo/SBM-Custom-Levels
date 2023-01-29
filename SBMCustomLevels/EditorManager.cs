@@ -532,6 +532,8 @@ namespace SBM_CustomLevels
                 loadedObject.AddComponent<EditorSelectable>();
             }
 
+            LevelManager.instance.CreateBackground(instance.worldStyle, true);
+
             GameObject playerSpawn_1 = Instantiate(playerSpawn);
             playerSpawn_1.name = "PlayerSpawn_1";
             playerSpawn_1.transform.position = spawnPos_1;
@@ -555,6 +557,9 @@ namespace SBM_CustomLevels
         public static void LoadNewEditorLevel()
         {
             InEditor = true;
+            instance.worldStyle = 1;
+
+            LevelManager.instance.CreateBackground(1, true);
 
             GameObject playerSpawn_1 = Instantiate(playerSpawn);
             playerSpawn_1.name = "PlayerSpawn_1";
