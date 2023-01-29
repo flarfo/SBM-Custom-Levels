@@ -54,6 +54,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WaterFoam_B.png) | World4_BG |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World5_BG.png) | World5_BG |
 
+
 ### World 1
 | Object | Name | Notes |
 :-------------:|:-------------:|:-----:
@@ -82,6 +83,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Tree_A.png) | Tree_A |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Tree_B.png) | Tree_B |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Tree_Static.png) | Tree_Static |
+
 
 ### World 2
 | Object | Name | Notes |
@@ -159,6 +161,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Stalagmite.png) | Stalagmite |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World3_Block_1x1_Bevel.png) | World3_Block_1x1_Bevel |
 
+
 ### World 4
 | Object | Name | Notes |
 :-------------:|:-------------:|:-----:
@@ -201,6 +204,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/TreasureChest.png) | TreasureChest |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WaterFoam_B.png) | Water | Can be configured to rise/fall.
 
+
 ### World 5
 | Object | Name | Notes |
 :-------------:|:-------------:|:-----:
@@ -221,6 +225,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/RingOfFire.png) | RingOfFire |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/SparkShower.png) | SparkShower |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Spotlight.png) | Spotlight |
+
 
 ## License
 The SBM Custom Levels project is licensed under the GPL-3.0 license.
