@@ -47,7 +47,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Signpost_Death.png) | Signpost_Death |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Spikes.png) | Spikes |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/SpringBoard.png) | SpringBoard |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WaterFoam_B.png) | WaterFoam_B |
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WaterFoam_B.png) | World4_BG |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World3_BG.png) | World3_BG |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/World5_BG.png) | World5_BG |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WorldBG_1.png) | WorldBG_1 |
