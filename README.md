@@ -39,7 +39,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ### Options Menu
 | Object | Name | Description |
 :-------------:|:-------------:|:-----:
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Carrot.png) | Carrot | argh
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Carrot.png) | Carrot |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/EasterEgg.png) | EasterEgg |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/KillBounds.png) | KillBounds |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/PlayerSpawn.png) | PlayerSpawn |
