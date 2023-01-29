@@ -134,7 +134,6 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Block_W3_Corner.png) | Block_W3_Corner |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Boulder.png) | Boulder |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderDestroyer.png) | BoulderDestroyer | Destroys boulders on collision.
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderRollable.png) | BoulderRollable |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderRollable.png.png) | BoulderRollable |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderSpawner.png) | BoulderSpawner | Periodically spawns boulders.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Boulder_Kickable.png) | Boulder_Kickable |
@@ -200,7 +199,7 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Seashell.png) | Seashell |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Seaweed.png) | Seaweed |
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/TreasureChest.png) | TreasureChest |
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Water.png) | Water | Can be configured to rise/fall.
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WaterFoam_B.png) | Water | Can be configured to rise/fall.
 
 ### World 5
 | Object | Name | Notes |
