@@ -287,74 +287,48 @@ namespace SBM_CustomLevels
                 {
                     hitSelectable = hit.collider.GetComponent<EditorSelectable>();
                 }
-                 
-                //check if water/minecart to enable custom UI
-                if (hitSelectable)
+                
+                if (!hitSelectable)
                 {
-                    bool activateWaterUI = false;
-                    bool activateRailUI = false;
+                    return;
+                }
 
-                    if (hitSelectable.GetComponent<FakeWater>())
-                    {
-                        activateWaterUI = true;
-                    }
-                    else if (hitSelectable.GetComponent<MinecartRailNode>())
-                    {
-                        activateRailUI = true;
-                    }
+                bool activateWaterUI = false;
+                bool activateRailUI = false;
 
-                    //if control pressed, already selected objects will be deselected, nonselected objects will be appened to selection
-                    if (ctrlClicked)
+                //check if water/minecart to enable custom UI
+                if (hitSelectable.GetComponent<FakeWater>())
+                {
+                    activateWaterUI = true;
+                }
+                else if (hitSelectable.GetComponent<MinecartRailNode>())
+                {
+                    activateRailUI = true;
+                }
+
+                //if control pressed, already selected objects will be deselected, nonselected objects will be appened to selection
+                if (ctrlClicked)
+                {
+                    if (hitSelectable.Selected)
                     {
-                        if (hitSelectable.Selected)
+                        curSelected.Remove(hitSelectable);
+                        hitSelectable.Selected = false;
+
+                        if (curSelected.Count == 0)
                         {
-                            curSelected.Remove(hitSelectable);
-                            hitSelectable.Selected = false;
+                            EditorUI.instance.EnableInspector(false);
+                            EditorUI.instance.EnableWaterUI(false);
+                            EditorUI.instance.EnableRailUI(false);
 
-                            if (curSelected.Count == 0)
-                            {
-                                EditorUI.instance.EnableInspector(false);
-                                EditorUI.instance.EnableWaterUI(false);
-                                EditorUI.instance.EnableRailUI(false);
+                            EditorUI.instance.curWater = null;
+                            EditorUI.instance.curRailNode = null;
 
-                                EditorUI.instance.curWater = null;
-                                EditorUI.instance.curRailNode = null;
-
-                                return;
-                            }
+                            return;
                         }
-                        else
-                        {
-                            curSelected.Add(hitSelectable);
-                            hitSelectable.Selected = true;
-                        }
-
-                        if (activateWaterUI)
-                        {
-                            EditorUI.instance.curWater = hitSelectable.GetComponent<FakeWater>();
-                            EditorUI.instance.SetWaterKeyframes();
-                            EditorUI.instance.EnableWaterUI(true);
-                        }
-
-                        if (activateRailUI)
-                        {
-                            EditorUI.instance.curRailNode = hitSelectable.GetComponent<MinecartRailNode>();
-                            EditorUI.instance.SetRailInformation();
-                            EditorUI.instance.EnableRailUI(true);
-                        }
-                        
-                        return;
                     }
-
-                    //disable all other selections
-                    foreach (EditorSelectable selectable in curSelected)
+                    else
                     {
-                        selectable.Selected = false;
-                    }
-
-                    if (!hitSelectable.Selected)
-                    {
-                        curSelected = new List<EditorSelectable>() { hitSelectable };
+                        curSelected.Add(hitSelectable);
                         hitSelectable.Selected = true;
                     }
 
@@ -362,26 +336,55 @@ namespace SBM_CustomLevels
                     {
                         EditorUI.instance.curWater = hitSelectable.GetComponent<FakeWater>();
                         EditorUI.instance.SetWaterKeyframes();
-                    }
-                    else
-                    {
-                        EditorUI.instance.curWater = null;
+                        EditorUI.instance.EnableWaterUI(true);
                     }
 
                     if (activateRailUI)
                     {
                         EditorUI.instance.curRailNode = hitSelectable.GetComponent<MinecartRailNode>();
                         EditorUI.instance.SetRailInformation();
+                        EditorUI.instance.EnableRailUI(true);
                     }
-                    else
-                    {
-                        EditorUI.instance.curRailNode = null;
-                    }
-
-                    EditorUI.instance.EnableInspector(true);
-                    EditorUI.instance.EnableWaterUI(activateWaterUI);
-                    EditorUI.instance.EnableRailUI(activateRailUI);
+                        
+                    return;
                 }
+
+                //disable all other selections
+                foreach (EditorSelectable selectable in curSelected)
+                {
+                    selectable.Selected = false;
+                }
+
+                if (!hitSelectable.Selected)
+                {
+                    curSelected = new List<EditorSelectable>() { hitSelectable };
+                    hitSelectable.Selected = true;
+                }
+
+                if (activateWaterUI)
+                {
+                    EditorUI.instance.curWater = hitSelectable.GetComponent<FakeWater>();
+                    EditorUI.instance.SetWaterKeyframes();
+                }
+                else
+                {
+                    EditorUI.instance.curWater = null;
+                }
+
+                if (activateRailUI)
+                {
+                    EditorUI.instance.curRailNode = hitSelectable.GetComponent<MinecartRailNode>();
+                    EditorUI.instance.SetRailInformation();
+                }
+                else
+                {
+                    EditorUI.instance.curRailNode = null;
+                }
+
+                EditorUI.instance.EnableInspector(true);
+                EditorUI.instance.EnableWaterUI(activateWaterUI);
+                EditorUI.instance.EnableRailUI(activateRailUI);
+
             }
         }
 
@@ -463,7 +466,7 @@ namespace SBM_CustomLevels
             instance.worldStyle = (int)char.GetNumericValue(rawText[0]);
             rawText = rawText.Remove(0, 1);
 
-            LevelManager.instance.CreateBackground(instance.worldStyle, true);
+            instance.background = LevelManager.instance.CreateBackground(instance.worldStyle);
 
             ObjectContainer json = JsonConvert.DeserializeObject<ObjectContainer>(rawText);
 
@@ -532,8 +535,6 @@ namespace SBM_CustomLevels
                 loadedObject.AddComponent<EditorSelectable>();
             }
 
-            LevelManager.instance.CreateBackground(instance.worldStyle, true);
-
             GameObject playerSpawn_1 = Instantiate(playerSpawn);
             playerSpawn_1.name = "PlayerSpawn_1";
             playerSpawn_1.transform.position = spawnPos_1;
@@ -559,7 +560,7 @@ namespace SBM_CustomLevels
             InEditor = true;
             instance.worldStyle = 1;
 
-            LevelManager.instance.CreateBackground(1, true);
+            instance.background = LevelManager.instance.CreateBackground(1);
 
             GameObject playerSpawn_1 = Instantiate(playerSpawn);
             playerSpawn_1.name = "PlayerSpawn_1";
@@ -815,12 +816,16 @@ namespace SBM_CustomLevels
         /// </summary>
         private static void UndoDeleteRailNode(UndoStruct undo)
         {
-            // spline cannot have fewer than two nodes
-            if (undo.railNode.railSpline.nodes.Count > 2)
-            {
-                AddRedo(UndoType.DeleteRailNode, new List<EditorSelectable>(undo.editorObjects), undo.railNode);
+            AddRedo(UndoType.DeleteRailNode, new List<EditorSelectable>(undo.editorObjects), undo.railNode);
 
-                undo.railNode.gameObject.SetActive(true);
+            undo.railNode.gameObject.SetActive(true);
+            
+            if (undo.railNode.railSpline.nodes.Count <= undo.railNodeIndex)
+            {
+                undo.railNode.railSpline.AddNode(undo.railNode.node);
+            }
+            else
+            {
                 undo.railNode.railSpline.InsertNode(undo.railNodeIndex, undo.railNode.node);
             }
         }

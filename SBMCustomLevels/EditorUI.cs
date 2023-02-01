@@ -567,10 +567,8 @@ namespace SBM_CustomLevels
                                 break;
                         }
 
-                        EditorManager.instance.background = Instantiate(Resources.Load<GameObject>(RecordLevel.NameToPath(button.gameObject.name)));
                         RenderSettings.skybox.shader = Shader.Find("Skybox/Horizon With Sun Skybox");
-
-                        //light
+                        EditorManager.instance.background = Instantiate(Resources.Load<GameObject>(RecordLevel.NameToPath(button.gameObject.name)));
                     });
 
                     continue;
@@ -590,7 +588,7 @@ namespace SBM_CustomLevels
                         fakeWater.height = 2;
                         curWater = fakeWater;
                         ClearWaterKeyframes();
-                        waterUI.SetActive(true);
+                        EnableWaterUI(true);
                     }
                     else if (button.gameObject.name == "IceSledSpikesGuide")
                     {
@@ -639,6 +637,9 @@ namespace SBM_CustomLevels
                     {
                         spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                     }
+
+                    EnableRailUI(false);
+                    curRailNode = null;
 
                     spawnedObject.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
 

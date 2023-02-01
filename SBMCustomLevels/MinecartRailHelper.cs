@@ -9,6 +9,7 @@ namespace SBM_CustomLevels
     {
         public static Mesh railSplineTile;
         public static Material railMaterial;
+        public static GameObject railNodeHandle;
 
         public static GameObject SpawnNewRail(Vector3 position)
         {
@@ -61,9 +62,6 @@ namespace SBM_CustomLevels
             splineTile.mode = MeshBender.FillingMode.Repeat;
             splineTile.updateInPlayMode = true;
 
-            //MeshBender bender = rail.AddComponent<MeshBender>();
-            //bender.mode = MeshBender.FillingMode.Repeat;
-
             rail.transform.position = railObject.GetPosition();
             rail.transform.rotation = Quaternion.Euler(railObject.GetRotation());
             rail.transform.localScale = railObject.GetScale();
@@ -86,7 +84,7 @@ namespace SBM_CustomLevels
 
         private static MinecartRailNode CreateNodeHandle(Transform parentRail, SplineNode node)
         {
-            GameObject nodeHandle = GameObject.Instantiate(Resources.Load(RecordLevel.NameToPath("MinecartRail_Sleeper_SplineTile")) as GameObject);
+            GameObject nodeHandle = GameObject.Instantiate(railNodeHandle);
             nodeHandle.name = "Node";
             nodeHandle.transform.parent = parentRail;
 
@@ -97,7 +95,7 @@ namespace SBM_CustomLevels
             MinecartRailNode railNode = nodeHandle.AddComponent<MinecartRailNode>();
             railNode.railSpline = parentRail.GetComponent<Spline>();
             railNode.node = node;
-
+            //make node a cube that renders on top
             return railNode;
         }
 

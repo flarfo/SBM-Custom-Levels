@@ -58,7 +58,7 @@ namespace SBM_CustomLevels
             }
         }
 
-        private void LoadLevelScene(string path, bool isEditor)
+        private void LoadLevel(bool isEditor, bool newLevel, string path)
         {
             //create a base scene in assetbundle
             AssetBundle sceneBundle = LevelLoader_Mod.GetAssetBundleFromResources("scene-bundle");
@@ -67,6 +67,7 @@ namespace SBM_CustomLevels
 
             AsyncOperation asyncOperation = SceneManager.LoadSceneAsync("base level", loadSceneParameters);
 
+            // load level after scene is loaded
             asyncOperation.completed += delegate (AsyncOperation o)
             {
                 SceneSystem.SetActiveScene("base level");
@@ -81,11 +82,67 @@ namespace SBM_CustomLevels
                     {
                         SceneManager.MoveGameObjectToScene(gameObject, sceneByName);
                     }
-                }   
+                }
+
+                int worldStyle = 1;
+
+                if (isEditor)
+                {
+                    if (newLevel)
+                    {
+                        EditorManager.LoadNewEditorLevel();
+                    }
+                    else
+                    {
+                        EditorManager.LoadEditorLevel(path);
+                    }
+
+                    EditorManager.instance.InitializeEditor();
+                }
+                else
+                {
+                    lastWorldStyle = worldStyle;
+                    worldStyle = LoadJSONLevel(path);
+                }
+
+                Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject); //must happen AFTER carrot is loaded in, otherwise some stuff is goofed^
+
+                if (isEditor)
+                {
+                    //add camera controller, (camera loaed in LevelPrefab_Story), moved from InitializeEditor as camera didnt exist previously...)
+                    Camera.main.gameObject.AddComponent<CameraController>();
+
+                    EditorManager.instance.editorCamera = Camera.main;
+
+                    Destroy(GameObject.Find("Player 1"));
+                    GameObject player2 = GameObject.Find("Player 2");
+                    if (player2)
+                    {
+                        Destroy(player2);
+                    }
+
+                    SBM.Shared.Audio.AudioSystem.FadeOutMusicVolume();
+                }
+                else
+                {
+                    //play correct music for world style (based on world background selected)
+                    SBM.Shared.Audio.Song song = SBM.Shared.Level.LevelSystem.GetWorld(worldStyle - 1).Song;
+
+                    bool playIntro = true;
+
+                    // if last world style is different, play intro
+                    // if last world style is same, dont play intro
+                    if (lastWorldStyle == worldStyle)
+                    {
+                        playIntro = false;
+                    }
+
+                    SBM.Shared.Audio.AudioSystem.instance.ScheduleSong(song, playIntro);
+                }
             };
         }
 
-        private void LoadLevel(bool isEditor, bool newLevel, string path)
+        /*private void LoadLevel(bool isEditor, bool newLevel, string path)
         {
             LoadLevelScene(path, isEditor);
 
@@ -144,7 +201,7 @@ namespace SBM_CustomLevels
 
                 SBM.Shared.Audio.AudioSystem.instance.ScheduleSong(song, playIntro);
             }
-        }
+        }*/
 
         private int LoadJSONLevel(string path)
         {
@@ -164,7 +221,7 @@ namespace SBM_CustomLevels
             int worldStyle = (int)char.GetNumericValue(rawText[0]);
             rawText = rawText.Remove(0, 1);
 
-            CreateBackground(worldStyle, false);
+            CreateBackground(worldStyle);
 
             ObjectContainer json = JsonConvert.DeserializeObject<ObjectContainer>(rawText);
 
@@ -284,7 +341,7 @@ namespace SBM_CustomLevels
             return nextLevel;
         }
 
-        public void CreateBackground(int worldStyle, bool isEditor)
+        public GameObject CreateBackground(int worldStyle)
         {
             GameObject bg;
 
@@ -318,10 +375,7 @@ namespace SBM_CustomLevels
 
             RenderSettings.skybox.shader = Shader.Find("Skybox/Horizon With Sun Skybox");
 
-            if (isEditor)
-            {
-                EditorManager.instance.background = bg;
-            }
+            return bg;
         }
 
         public static void FadeOutCustomScene(Color start, Color end, SBM.UI.Components.ScreenFader screenFader)

@@ -19,7 +19,7 @@ namespace SBM_CustomLevels
                 SetInspectorInfo();
 
                 // carrots are weird, outlines dont reset when deselected. fixes outline staying baked permanently
-                if (!value && gameObject.name.Contains("Carrot"))
+                if (!value && (gameObject.name.Contains("Carrot") || gameObject.name.Contains("HotdogKart")))
                 {
                     outline.FixInstantiated();
                 }

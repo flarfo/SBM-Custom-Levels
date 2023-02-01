@@ -29,7 +29,10 @@ namespace SBM_CustomLevels
         {
 			if (sceneEvent == SBM.Shared.SceneEvent.LoadComplete && scene.name == "Menu")
             {
-				SBM.Shared.Audio.AudioSystem.instance.musicMain.volume = 1f;
+				if (SBM.Shared.Audio.AudioSystem.instance)
+                {
+					SBM.Shared.Audio.AudioSystem.instance.musicSource.volume = 1f;
+				}
             }
         }
 
