@@ -25,8 +25,6 @@ namespace SBM_CustomLevels
             splineTile.mode = MeshBender.FillingMode.Repeat;
             splineTile.updateInPlayMode = true;
 
-            //rail.AddComponent<MeshBender>();
-
             Vector3 startPos = new Vector3(-1, 0, 0);
             SplineNode startNode = new SplineNode(startPos, new Vector3(1, 0, 0));
             railSpline.AddNode(startNode);

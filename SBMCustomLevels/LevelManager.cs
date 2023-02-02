@@ -271,14 +271,12 @@ namespace SBM_CustomLevels
         {
             if (!File.Exists(path))
             {
-                Debug.Log("Level does not exist!");
-                return;
+                throw new Exception("Level does not exist!");
             }
 
             if (File.ReadAllBytes(path).Length == 0 && !isEditor)
             {
-                Debug.Log("Empty level attempted to load! Make sure to save in editor first.");
-                return;
+                throw new Exception("Empty level attempted to load! Make sure to save in editor first.");
             }
 
             PreviousSceneName = SceneManager.GetActiveScene().name;

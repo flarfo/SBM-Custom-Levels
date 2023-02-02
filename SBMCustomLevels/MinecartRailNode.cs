@@ -45,16 +45,26 @@ namespace SBM_CustomLevels
             int nodeID = railSpline.nodes.IndexOf(node);
 
             node.Position = transform.localPosition;
-            railSmoother.SmoothNode(node);
 
             if (nodeID == 0)
             {
                 node.Direction = node.Position + railSpline.nodes[1].Direction - railSpline.nodes[1].Position;
 
+                railSmoother.SmoothNode(node);
+                railSmoother.SmoothNode(railSpline.nodes[nodeID + 1]);
+
                 return;
             }
 
             node.Direction = node.Position - railSpline.nodes[nodeID - 1].Position + railSpline.nodes[nodeID - 1].Direction;
+
+            railSmoother.SmoothNode(node);
+            railSmoother.SmoothNode(railSpline.nodes[nodeID - 1]);
+
+            if (railSpline.nodes.Count-1 != nodeID)
+            {
+                railSmoother.SmoothNode(railSpline.nodes[nodeID + 1]);
+            }
         }
     }
 }

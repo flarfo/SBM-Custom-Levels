@@ -96,7 +96,7 @@ namespace SBM_CustomLevels
 
         private void Update()
         {
-            if (!inEditor)
+            if (!inEditor || !editorUI)
             {
                 return;
             }
@@ -328,6 +328,8 @@ namespace SBM_CustomLevels
                     }
                     else
                     {
+                        EditorUI.instance.EnableInspector(true);
+
                         curSelected.Add(hitSelectable);
                         hitSelectable.Selected = true;
                     }

@@ -675,10 +675,16 @@ namespace SBM_CustomLevels
                 {
                     return false;
                 }
+                try
+                {
+                    LevelManager.instance.BeginLoadLevel(false, false, b.GetComponent<CustomLevelID>().ID, b.GetComponent<CustomLevelID>().levelNumber);
 
-                LevelManager.instance.BeginLoadLevel(false, false, b.GetComponent<CustomLevelID>().ID, b.GetComponent<CustomLevelID>().levelNumber);
-
-                return false;
+                    return false;
+                }
+                catch
+                {
+                    return false;
+                }
             }
 
             return true;

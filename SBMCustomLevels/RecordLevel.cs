@@ -89,7 +89,7 @@ namespace SBM_CustomLevels
                 {
                     waterObjects.Add(new WaterObject(objects[i].gameObject));
                 }
-                else if (objectName.Contains("Rail"))
+                else if (objectName.Contains("MinecartRail") && !objectName.Contains("Sleeper"))
                 {
                     railObjects.Add(new RailObject(objects[i].gameObject));
                 }

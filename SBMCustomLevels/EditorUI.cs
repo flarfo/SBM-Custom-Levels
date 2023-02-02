@@ -633,6 +633,11 @@ namespace SBM_CustomLevels
 
                         return;
                     }
+                    else if (button.gameObject.name == "MinecartRail_Sleeper")
+                    {
+                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
+                        spawnedObject.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
+                    }
                     else
                     {
                         spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;

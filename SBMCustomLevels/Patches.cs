@@ -314,8 +314,14 @@ namespace SBM_CustomLevels
 
 				if (nextLevel != string.Empty)
                 {
-					// LevelManager.FadeOutCustomScene(Color.clear, Color.black, __instance.screenFader);
-					LevelManager.instance.BeginLoadLevel(false, false, nextLevel, -1);
+					try
+					{
+						LevelManager.instance.BeginLoadLevel(false, false, nextLevel, -1);
+					}
+                    catch
+                    {
+						SceneSystem.LoadScene("Menu");
+					}
 				}
                 else // if no next level, return to menu
                 {

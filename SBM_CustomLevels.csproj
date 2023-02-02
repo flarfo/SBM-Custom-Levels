@@ -166,14 +166,17 @@
     <Compile Include="SBMCustomLevels\SplineSmoother.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="SBMCustomLevels\sbm-bundle" />
-    <EmbeddedResource Include="SBMCustomLevels\scene-bundle" />
+    <EmbeddedResource Include="BundleWindows\sbm-bundle" />
+    <EmbeddedResource Include="BundleWindows\scene-bundle" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="SBMCustomLevels\ui-bundle" />
+    <EmbeddedResource Include="BundleWindows\ui-bundle" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
+    <None Include="BundleMac\sbm-bundle" />
+    <None Include="BundleMac\scene-bundle" />
+    <None Include="BundleMac\ui-bundle" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
