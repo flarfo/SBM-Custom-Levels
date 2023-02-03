@@ -47,6 +47,9 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 :--------:|:--------:
 W | Toggles move tool
 E | Toogles select tool
+Left Mouse | Select/move
+Middle Mouse | Pan camera
+Scroll | Zoom in/out
 Ctrl+Z | Undo
 Ctrl+Y | Redo
 Ctrl+C | Copy
