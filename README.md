@@ -13,6 +13,8 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 
 [Editor Information](#editor-information)
 
+[Object Information](#object-information)
+
 ## Manual Installation
 **Download the [latest release](https://github.com/flarfo/SBM-Custom-Levels/releases)**
 
@@ -39,6 +41,29 @@ SBM Custom Levels is a mod for Super Bunny Man that allows users to create and p
 **Launch the game and have fun!**
 
 ## Editor Information
+
+### Keybinds
+| Keybind | Effect |
+:--------:|:--------:
+W | Toggles move tool
+E | Toogles select tool
+Ctrl+Z | Undo
+Ctrl+Y | Redo
+Ctrl+C | Copy
+Ctrl+V | Paste
+Ctrl+X | Cut
+Ctrl+S | Save
+Delete | Deletes select objects
+Ctrl+Left Click | Adds/removes object from selection
+` | Opens options menu
+1 | Opens first world objects
+2 | Opens second world objects
+3 | Opens third world objects
+4 | Opens fourth world objects
+5 | Opens fifth world objects
+
+
+## Object Information
 
 ### Options Menu
 | Object | Name | Notes |
