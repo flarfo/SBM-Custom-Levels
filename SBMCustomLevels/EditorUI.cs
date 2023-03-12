@@ -194,6 +194,7 @@ namespace SBM_CustomLevels
                     }
 
                     editorSelectable.gameObject.SetActive(false);
+                    EditorManager.instance.selectableObjects.Remove(editorSelectable);
                     deletedObjects.Add(editorSelectable);
                 }
 
@@ -268,6 +269,7 @@ namespace SBM_CustomLevels
                         curRailNode.railSpline.RemoveNode(curRailNode.node);
 
                         EditorManager.instance.curSelected.Remove(editorSelectable);
+                        EditorManager.instance.selectableObjects.Remove(editorSelectable);
 
                         curRailNode.gameObject.SetActive(false);
                         curRailNode = null;

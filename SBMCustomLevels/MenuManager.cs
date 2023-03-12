@@ -14,6 +14,7 @@ using UIWorldSelector = SBM.UI.MainMenu.StoryMode.UIWorldSelector;
 using UITransitioner = SBM.UI.Utilities.Transitioner.UITransitioner;
 using UITransitionerCarousel = SBM.UI.Utilities.Transitioner.UITransitionerCarousel;
 using UIScaler = SBM.UI.Scaler.UIScaler;
+using SoftMasking;
 
 namespace SBM_CustomLevels
 {
@@ -23,7 +24,7 @@ namespace SBM_CustomLevels
         public static MenuManager instance;
 
         private UIWorldSelector worldSelector;
-        private UIFocusable editorWorldUI;
+        private UIFocusable levelEditorButton;
 
         private UIFocusable worldNameButton;
         private InputField worldNameField;
@@ -34,9 +35,10 @@ namespace SBM_CustomLevels
         //private Text addToWorldText;
 
         private string selectedWorld;
+        private bool worldsSelectsCreated = false;
 
         private int worldCount = 0;
-        private int lastWorldSelected = -1;
+        private int lastWorldSelected = 0;
         private int selectedWorldIndex = 0;
         private List<UIFocusable> customWorlds = new List<UIFocusable>();
 
@@ -256,23 +258,23 @@ namespace SBM_CustomLevels
         }
 
         private void CreateNewWorld(string worldPath)
-        {
+        {;
             //worldCount + 6, initially there are 5 worlds
             //worldCount + 5, world 1 is set at position 0
 
             GameObject worldModel = Instantiate(FindInactiveGameObject("WorldModel_1"), FindInactiveGameObject("transform").transform); //create a copy of world 1's world model for custom world
-            worldModel.transform.localPosition = new Vector3(5*(worldCount+5), 0, 0); //set to proper position (5 to the right of world 5)
-
+            worldModel.transform.localPosition = new Vector3(5 * (worldCount + 5), 0, 0); //set to proper position (5 to the right of world 5)
+            
             UIFocusable worldUI_1 = FindInactiveGameObject("World 1").GetComponent<UIFocusable>();
             UIFocusable worldUI = Instantiate(worldUI_1.gameObject, worldUI_1.transform.parent).GetComponent<UIFocusable>();
-            worldUI.gameObject.name = "World " + (worldCount+6);
-
+            worldUI.gameObject.name = "World " + (worldCount + 6);
+            
             UIWorldSelector worldSelector = FindInactiveGameObject<UIWorldSelector>("World Selector");
 
             UIFocusableGroup worldSelectorGroup = worldSelector.GetComponent<UIFocusableGroup>();
             worldSelectorGroup.group = worldSelectorGroup.group.Append(worldUI).ToArray(); //add new world to worldselector group, fixes selected world swapping when changing focus
-
-            int worldIndex = worldCount + 6;
+            
+            int worldIndex = worldCount + 5;
 
             worldUI.onFocused = new UnityEngine.Events.UnityEvent();
             worldUI.onFocused.AddListener(delegate
@@ -280,17 +282,17 @@ namespace SBM_CustomLevels
                 worldSelector.onSelectedWorldIsUnlocked.Invoke();
                 worldSelector.SetSelectedWorldIndex(worldIndex);
             });
-
+            
             worldUI.onSubmit.AddListener(delegate
             {
                 lastWorldSelected = worldIndex;
             });
-
+            
             customWorlds.Add(worldUI);
 
             //set ui navtargets for changing worlds
             worldUI.navTargetRight = null;
-
+            
             if (worldCount == 0)
             {
                 UIFocusable world5 = FindInactiveGameObject<UIFocusable>("World 5");
@@ -301,29 +303,29 @@ namespace SBM_CustomLevels
             else
             {
                 worldUI.navTargetLeft = customWorlds[worldCount - 1];
-                customWorlds[worldCount - 1].navTargetRight = worldUI;  
+                customWorlds[worldCount - 1].navTargetRight = worldUI;
             }
-
+            
             //make world selecting arrows properly animate/color with custom worlds
             UI.Utilities.Focus.UIFocusableColorShift.Condition newCondition = new UI.Utilities.Focus.UIFocusableColorShift.Condition();
             newCondition.Focusable = worldUI;
             newCondition.AnimateWhen = UI.Utilities.Focus.UIFocusableConditionHandler.ConditionType.NotFocused;
-
+            
             UI.Utilities.Focus.UIFocusableColorShift arrowLeft = FindInactiveGameObject<UI.Utilities.Focus.UIFocusableColorShift>("Arrow_Left");
             arrowLeft.conditions = arrowLeft.conditions.Append(newCondition).ToArray();
 
             UI.Utilities.Focus.UIFocusableColorShift arrowRight = FindInactiveGameObject<UI.Utilities.Focus.UIFocusableColorShift>("Arrow_Right");
             arrowRight.conditions = arrowRight.conditions.Append(newCondition).ToArray();
-
-            UITransitionerCarousel worldNamesTransitioner = GameObject.Find("World Names").GetComponent<UITransitionerCarousel>();
+            
+            UITransitionerCarousel worldNamesTransitioner = FindInactiveGameObject<UITransitionerCarousel>("World Names");
             GameObject worldName_1 = FindInactiveGameObject<UI.Components.UI_SBMTheme_Text>("Text_WorldTitle_1").gameObject;
             //end
-
+            
             GameObject customWorldName = Instantiate(worldName_1, worldName_1.transform.parent);
-            customWorldName.name = "Text_WorldTitle_" + (worldCount+6);
+            customWorldName.name = "Text_WorldTitle_" + (worldCount + 6);
             customWorldName.SetActive(false);
             customWorldName.GetComponent<Text>().text = worldPath.Split('\\').Last();
-
+            
             worldNamesTransitioner.transitioners = worldNamesTransitioner.transitioners.Append(customWorldName.GetComponent<UITransitioner>()).ToArray();
 
             worldCount++;
@@ -358,11 +360,9 @@ namespace SBM_CustomLevels
             if (path.IndexOfAny(Path.GetInvalidPathChars()) == -1 && !File.Exists(path))
             {
                 using (File.Create(path)) { }
-
                 //TODO: get and update XML file when creating a new level
 
-                LevelLoader_Mod.UpdateWorldsList();
-
+                instance.UpdateWorldButtons();
                 instance.UpdateLevelButtons();
             }
         }
@@ -387,75 +387,24 @@ namespace SBM_CustomLevels
             {
                 Directory.CreateDirectory(path);
             }
+            else
+            {
+                return;
+            }
 
-            LevelLoader_Mod.UpdateWorldsList();
-
-            instance.CreateNewWorld(path);
+            if (worldsSelectsCreated)
+            {
+                instance.CreateNewWorld(path);
+            }
+            
             //instance.CreateCFG(path);
             instance.CreateNewLevel(path);
 
+            LevelLoader_Mod.UpdateWorldsList();
+
             instance.worldNameField.text = String.Empty;
-
+            
             instance.UpdateWorldButtons();
-        }
-
-        private void CreateEditorWorldSelect()
-        {
-            GameObject editorWorldModel = Instantiate(GameObject.Find("WorldModel_1"), GameObject.Find("transform").transform); //create a copy of world 1's world model for editor world
-            editorWorldModel.transform.localPosition = new Vector3(-5, 0, 0); //set to proper position (5 to the left of world 1)
-
-
-            UIFocusable worldUI_1 = GameObject.Find("World 1").GetComponent<UIFocusable>(); //cache world 1 ui
-            editorWorldUI = Instantiate(worldUI_1.gameObject, worldUI_1.transform).GetComponent<UIFocusable>(); //create a copy of world 1's ui
-            editorWorldUI.name = "World Editor";
-
-            //adjust ui targets to account for new world
-            worldUI_1.navTargetLeft = editorWorldUI;
-            editorWorldUI.navTargetRight = worldUI_1;
-
-            UITransitionerCarousel worldNamesTransitioner = GameObject.Find("World Names").GetComponent<UITransitionerCarousel>();
-
-            GameObject worldName_1 = FindInactiveGameObject<UI.Components.UI_SBMTheme_Text>("Text_WorldTitle_1").gameObject;
-
-            GameObject editorWorldName = Instantiate(worldName_1, worldName_1.transform.parent);
-            editorWorldName.SetActive(false);
-
-            editorWorldName.GetComponent<Text>().text = "Level Editor";
-
-            worldNamesTransitioner.transitioners = worldNamesTransitioner.transitioners.Append(editorWorldName.GetComponent<UITransitioner>()).ToArray();
-
-            UIFocusableGroup worldSelectorGroup = worldSelector.GetComponent<UIFocusableGroup>();
-            worldSelectorGroup.group = worldSelectorGroup.group.Append(editorWorldUI).ToArray(); //add new world to worldselector group, fixes selected world swapping when changing focus
-
-            editorWorldUI.onFocused.AddListener(delegate
-            {
-                worldSelector.SetSelectedWorldIndex(5);
-            });
-
-            editorWorldUI.onNavRightSuccess.AddListener(delegate
-            {
-                editorWorldName.GetComponent<UITransitioner>().Transition_Out_To_Left();
-                worldName_1.GetComponent<UITransitioner>().Transition_In_From_Right();
-            });
-
-            //adjust listeners so that when loading the level editor UI, no level select menu is brought up
-            worldUI_1.onNavRightSuccess.AddListener(delegate
-            {
-                editorWorldName.SetActive(false);
-            });
-
-            worldUI_1.onFocused.AddListener(delegate
-            {
-                if (editorWorldName.activeSelf)
-                {
-                    editorWorldName.SetActive(false);
-                    worldName_1.GetComponent<UITransitioner>().Transition_In_From_Right();
-                }
-            });
-
-            editorWorldUI.onNavRightFailed = worldUI_1.onNavRightFailed;
-            editorWorldUI.onNavLeftSuccess = worldUI_1.onNavLeftSuccess;
-            editorWorldUI.onNavLeftFailed = worldUI_1.onNavLeftFailed;
         }
 
         private void CreateWorldSelects()
@@ -471,6 +420,8 @@ namespace SBM_CustomLevels
             {
                 level.gameObject.AddComponent<CustomLevelID>(); // add custom id component to identify which custom level each button points to
             }
+
+            worldsSelectsCreated = true;
         }
 
         private void CreateMenuUI()
@@ -488,33 +439,32 @@ namespace SBM_CustomLevels
 
             buttonContainer.GetComponent<UIFocusable>().onCancel.AddListener(delegate
             {
-                instance.worldSelector.gameObject.GetComponent<UITransitioner>().Transition_In_From_Center();
+                FindInactiveGameObject<UITransitioner>("Screen_MainMenu").Transition_In_From_Bottom();
             });
 
             GameObject editLevelButton = GameObject.Find("EditLevelButton");
             editLevelButton.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
             {
-                if (worldCount == 0)
+                if (worldCount == 0 && LevelLoader_Mod.worldsList.Count == 0)
                 {
                     CreateWorldEvent("Default World");
                 }
             });
-
-
+            
             instance.UpdateWorldButtons();
-
+            
             GameObject newWorldUI = GameObject.Find("NewWorldUI");
 
             GameObject worldNameUI = GameObject.Find("WorldNameField");
             instance.worldNameButton = worldNameUI.GetComponent<UIFocusable>();
             instance.worldNameField = worldNameUI.GetComponent<InputField>();
-
+            
             GameObject worldCreateButton = GameObject.Find("CreateButton");
             worldCreateButton.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
             {
                 CreateWorldEvent(instance.worldNameField.text);
             });
-
+            
             UIFocusable addLevelButton = GameObject.Find("AddLevelButton").GetComponent<UIFocusable>();
             addLevelButton.onSubmitSuccess.AddListener(delegate
             {
@@ -523,15 +473,15 @@ namespace SBM_CustomLevels
                     CreateNewLevel(selectedWorld);
                 }
             });
-
-            editorWorldUI.onSubmitSuccess = new UnityEngine.Events.UnityEvent(); //UIFocusable events are CACHED!!!! meaning they are carried over when instantiated :(
-            editorWorldUI.onSubmitSuccess.AddListener(delegate
+            
+            levelEditorButton.onSubmitSuccess = new UnityEngine.Events.UnityEvent();
+            levelEditorButton.onSubmitSuccess.AddListener(delegate
             {
                 //open level editor ui
+                FindInactiveGameObject<UITransitioner>("Screen_MainMenu").Transition_Out_To_Bottom();
                 buttonContainer.GetComponent<UITransitioner>().Transition_In_From_Right();
-                worldSelector.GetComponent<UITransitioner>().Transition_Out_To_Center();
             });
-
+            
             loadedBundle.Unload(false);
 
             buttonContainer.SetActive(false);
@@ -539,6 +489,62 @@ namespace SBM_CustomLevels
 
             instance.customWorldSelector.SetActive(false);
             instance.customLevelSelector.SetActive(false);
+        }
+
+        [HarmonyPatch(typeof(SoftMask), "Start")]
+        [HarmonyPostfix]
+        static void UpdateMainMenu(SoftMask __instance)
+        { 
+            if (__instance.gameObject.name != "Button_PartyMode")
+            {
+                return;
+            }
+
+            AssetBundle uiBundle = LevelLoader_Mod.GetAssetBundleFromResources("ui-bundle");
+
+            GameObject editorButton = Instantiate(uiBundle.LoadAsset<GameObject>("Button_LevelEditor"));
+            editorButton.transform.parent = __instance.gameObject.transform.parent;
+            editorButton.transform.localPosition = new Vector3(87, -124.5f, 0);
+            editorButton.transform.localScale = Vector3.one;
+            editorButton.GetComponent<SoftMask>().defaultShader = Shader.Find("Hidden/UI Default (Soft Masked)");
+
+            RectTransform partyButton = __instance.gameObject.GetComponent<RectTransform>();
+
+            GameObject emptyGO = new GameObject();
+            emptyGO.transform.parent = partyButton;
+            emptyGO.transform.localPosition = new Vector3(0, -40, 0);
+            partyButton.GetChild(2).parent = emptyGO.transform;
+            partyButton.localScale = new Vector3(300 / partyButton.sizeDelta.x, 1, 1);
+            partyButton.localPosition = new Vector3(-140, -124.5f, 0);
+            emptyGO.transform.localScale = new Vector3(1 / partyButton.localScale.x, 1, 0);
+
+            foreach (Transform child in partyButton)
+            {
+                child.gameObject.AddComponent<SoftMaskable>();
+            }
+
+            Transform buttonContainer = partyButton.transform.parent;
+
+            UIFocusable coopFocusable = buttonContainer.GetChild(1).gameObject.GetComponent<UIFocusable>();
+            UIFocusable partyFocusable = buttonContainer.GetChild(2).gameObject.GetComponent<UIFocusable>();
+            UIFocusable settingsFocusable = buttonContainer.GetChild(3).gameObject.GetComponent<UIFocusable>();
+            UIFocusable quitFocusable = buttonContainer.GetChild(4).gameObject.GetComponent<UIFocusable>();
+
+            UIFocusable editorFocusable = editorButton.GetComponent<UIFocusable>();
+            editorFocusable.navTargetLeft = partyFocusable;
+            editorFocusable.navTargetRight = settingsFocusable;
+            editorFocusable.navTargetUp = coopFocusable;
+
+            coopFocusable.navTargetDown = editorFocusable;
+            partyFocusable.navTargetRight = editorFocusable;
+            settingsFocusable.navTargetLeft = editorFocusable;
+            quitFocusable.navTargetLeft = editorFocusable;
+
+            instance.levelEditorButton = editorFocusable;
+
+            uiBundle.Unload(false);
+
+            instance.CreateMenuUI();
         }
 
         [HarmonyPatch(typeof(UI.MainMenu.StoryMode.UIStoryWorldModels), "Awake")]
@@ -552,12 +558,12 @@ namespace SBM_CustomLevels
 
             instance.worldSelector.GetComponent<UIFocusable>().onFocused.AddListener(delegate
             {
-                instance.lastWorldSelected = -1;
+                instance.lastWorldSelected = 0;
             });
 
-            instance.CreateEditorWorldSelect();
+            //instance.CreateEditorWorldSelect();
             instance.CreateWorldSelects();
-            instance.CreateMenuUI();
+            //instance.CreateMenuUI();
         }
 
         [HarmonyPatch(typeof(UIWorldSelector), "SetSelectedWorldIndex")]
@@ -565,38 +571,10 @@ namespace SBM_CustomLevels
         static bool OverrideSelectedWorldIndex(UIWorldSelector __instance, int index)
         {
             instance.selectedWorldIndex = index;
-
+            
             if (index >= 5)
             {
                 __instance.onWorldSelected.Invoke(index);
-
-                return false;
-            }
-
-            return true;
-        }
-
-        [HarmonyPatch(typeof(UITransitionerCarousel), "SetIndex")]
-        [HarmonyPrefix]
-        static bool OverrideIndexPosition(UITransitionerCarousel __instance, int index)
-        {
-            if (__instance.gameObject.name != "World Names")
-            {
-                return true;
-            }
-
-            if (__instance.currentIndex == 5)
-            {
-                __instance.transitioners[__instance.currentIndex].Transition_Out_To_Right();
-                __instance.transitioners[index].Transition_In_From_Left();
-
-                return false;
-            }
-
-            if (index == 5)
-            {
-                __instance.transitioners[__instance.currentIndex].Transition_Out_To_Right();
-                __instance.transitioners[index].Transition_In_From_Left();
 
                 return false;
             }
@@ -608,16 +586,11 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
         static bool OverrideLevelButtons(UI.MainMenu.StoryMode.UIStoryLevelButtons __instance, int index)
         {
-            if (index == 5) //if level editor, dont set index
-            {
-                return false;
-            }
-
             UIFocusableGroup levelGroup = __instance.GetComponent<UIFocusableGroup>();
 
-            if (index >= 6) //if custom world, adjust level numbers
+            if (index >= 5) //if custom world, adjust level numbers
             {
-                int levelCount = LevelLoader_Mod.worldsList[index - 6].Item2.Count;
+                int levelCount = LevelLoader_Mod.worldsList[index - 5].Item2.Count;
                 
                 for (int i = 0; i < levelCount; i++)
                 {
@@ -630,7 +603,7 @@ namespace SBM_CustomLevels
 
                     levelButton.levelLock.SetActive(false);
                     levelButton.SetLevelNumber(i + 1);
-                    levelButton.GetComponent<CustomLevelID>().ID = LevelLoader_Mod.worldsList[index - 6].Item2[i];
+                    levelButton.GetComponent<CustomLevelID>().ID = LevelLoader_Mod.worldsList[index - 5].Item2[i];
                     levelButton.GetComponent<CustomLevelID>().levelNumber = i+1;
 
                     levelButton.gameObject.SetActive(true);
@@ -669,7 +642,7 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
         static bool OverrideLevelSelect(UI.MainMenu.StoryMode.UIStoryLevelButton b)
         {
-            if (instance.selectedWorldIndex >= 6) //if custom world selected, load custom level
+            if (instance.selectedWorldIndex >= 5) //if custom world selected, load custom level
             {
                 if (b.GetComponent<CustomLevelID>().ID == "NULL LEVEL") //if custom world has no levels, this button is the "No Levels" button - should not enter a level
                 {
@@ -714,23 +687,6 @@ namespace SBM_CustomLevels
             }
 
             return true;
-        }
-
-        [HarmonyPatch(typeof(UI.MainMenu.StoryMode.UIStoryWorldModels), "SetTargetWorldIndex")]
-        [HarmonyPrefix]
-        static void OverrideWorldModelIndex(ref int index)
-        {
-            Debug.Log("Index: " + index);
-
-            if (index == 5)
-            {
-                index = -1; //allow editor to be before world 1
-            }
-
-            if (index >= 6)
-            {
-                index = index - 1; //account for gap caused by editor being index 5, but at index -1
-            }
         }
     }
 

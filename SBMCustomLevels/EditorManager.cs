@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.UI;
 using SplineMesh;
 using System.IO;
 using System.Collections.Generic;
@@ -19,6 +20,8 @@ namespace SBM_CustomLevels
         public static GameObject iceSledSpikesGuide;
         public static GameObject playerSpawn;
 
+        public List<EditorSelectable> selectableObjects = new List<EditorSelectable>();
+
         public GameObject background;
 
         public static bool inEditor = false;
@@ -27,8 +30,12 @@ namespace SBM_CustomLevels
 
         public bool selectTool = false;
         public bool moveTool = false;
-
         private bool mouseUp = false;
+
+        private Texture2D whiteTexture;
+        private bool selectedUI;
+        private bool dragSelect;
+        private Vector3 dragPosition;
 
         private Vector2 snapVector = new Vector2(0, 0);
         public bool snapEnabled = false;
@@ -90,6 +97,10 @@ namespace SBM_CustomLevels
                 Debug.Log($"{GetType().Name} already exists, destroying object!");
                 Destroy(this);
             }
+
+            whiteTexture = new Texture2D(1, 1);
+            whiteTexture.SetPixel(0, 0, Color.white);
+            whiteTexture.Apply();
 
             defaultCube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
         }
@@ -186,6 +197,13 @@ namespace SBM_CustomLevels
             if (Input.GetKeyUp(KeyCode.Mouse0))
             {
                 mouseUp = true;
+
+                if (dragSelect == true)
+                {
+                    SelectWithinBounds(GetScreenRect(dragPosition, Input.mousePosition));
+                }
+
+                dragSelect = false;
             }
 
             // undo
@@ -228,21 +246,43 @@ namespace SBM_CustomLevels
                         continue;
                     }
 
-                    editorSelectable.gameObject.SetActive(false);
+                    editorSelectable.gameObject.SetActive(false);   
+                    selectableObjects.Remove(editorSelectable);
                     deletedObjects.Add(editorSelectable);
                 }
 
                 UndoManager.AddUndo(UndoManager.UndoType.Delete, deletedObjects);
+                
                 curSelected.Clear();
             }
 
-            //if pointer is over UI, no need to check 3D world for input
+            // if pointer is over UI, no need to check 3D world for input
             if (EventSystem.current.IsPointerOverGameObject())
             {
+                if (Input.GetKeyDown(KeyCode.Mouse0))
+                {
+                    selectedUI = true;
+                }
+
                 return;
             }
 
-            //selects object under mouse when select tool is active
+            // deselect all objects when right click
+            if (Input.GetKeyDown(KeyCode.Mouse1))
+            {
+                if (selectTool)
+                {
+                    foreach (EditorSelectable selectable in curSelected)
+                    {
+                        selectable.Selected = false;
+                    }
+
+                    curSelected.Clear();
+                    EditorUI.instance.EnableInspector(false);
+                }
+            }
+
+            // selects object under mouse when select tool is active
             if (Input.GetKeyDown(KeyCode.Mouse0))
             {
                 if (mouseUp && moveTool && curSelected.Count > 0)
@@ -252,20 +292,74 @@ namespace SBM_CustomLevels
 
                 if (selectTool)
                 {
+                    selectedUI = false;
+
+                    dragPosition = Input.mousePosition;
+
                     SelectObject(ctrlClicked);
                     return;
                 }
             }
 
-            //moves object under mouse when move tool is active
+            // moves object under mouse when move tool is active
             if (Input.GetKey(KeyCode.Mouse0))
             {
+                if (!selectedUI && (dragPosition - Input.mousePosition).magnitude > 10 && selectTool)
+                {
+                    dragSelect = true;
+                }
+
                 if (moveTool)
                 {
                     MoveObject();
                     return;
                 }
             }
+        }
+
+        // draw select box
+        private void OnGUI()
+        {
+            if (dragSelect)
+            {
+                GUI.color = new Color32(255, 0, 203, 100);
+                Rect rect = GetScreenRect(dragPosition, Input.mousePosition);
+                GUI.DrawTexture(rect, whiteTexture);
+            }
+        }
+
+        private Rect GetScreenRect(Vector3 screenPosition1, Vector3 screenPosition2)
+        {
+            // Move origin from bottom left to top left
+            screenPosition1.y = Screen.height - screenPosition1.y;
+            screenPosition2.y = Screen.height - screenPosition2.y;
+            // Calculate corners
+            var topLeft = Vector3.Min(screenPosition1, screenPosition2);
+            var bottomRight = Vector3.Max(screenPosition1, screenPosition2);
+            // Create Rect
+            return Rect.MinMaxRect(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y);
+        }
+
+        private void SelectWithinBounds(Rect rect)
+        {
+            bool objSelected = false;
+
+            foreach (EditorSelectable selectable in selectableObjects)
+            {
+                Vector3 screenPos = CameraController.camera.WorldToScreenPoint(selectable.transform.position);
+                // since: rect y position has 0 at top, 1080 at bottom - camera y position is 1080 at top, 0 at bottom
+                Vector3 adjustedScreenPos = new Vector3(screenPos.x, 1080 - screenPos.y, screenPos.z);
+                
+                if (rect.Contains(adjustedScreenPos))
+                {
+                    selectable.Selected = true;
+                    curSelected.Add(selectable);
+
+                    objSelected = true;
+                }
+            }
+
+            EditorUI.instance.EnableInspector(objSelected);
         }
 
         private void SelectObject(bool ctrlClicked)
@@ -437,6 +531,7 @@ namespace SBM_CustomLevels
             spawn2 = null;
             selectedLevel = null;
             curSelected = new List<EditorSelectable>();
+            selectableObjects = new List<EditorSelectable>();
             copiedObjects = new List<EditorSelectable>();
             snapEnabled = false;
             snapVector = new Vector2(0, 0);
@@ -755,6 +850,7 @@ namespace SBM_CustomLevels
             {
                 editorObject.gameObject.SetActive(false);
                 EditorManager.instance.curSelected.Remove(editorObject);
+                EditorManager.instance.selectableObjects.Remove(editorObject);
             }
         }
 
@@ -765,6 +861,7 @@ namespace SBM_CustomLevels
             foreach (EditorSelectable editorObject in undo.editorObjects)
             {
                 editorObject.gameObject.SetActive(true);
+                EditorManager.instance.selectableObjects.Add(editorObject);
             }
         }
 
@@ -911,6 +1008,7 @@ namespace SBM_CustomLevels
             foreach (EditorSelectable editorObject in redo.editorObjects)
             {
                 editorObject.gameObject.SetActive(true);
+                EditorManager.instance.selectableObjects.Add(editorObject);
             }
 
             Debug.Log(EditorManager.instance.curSelected.Count);
@@ -924,6 +1022,7 @@ namespace SBM_CustomLevels
             {
                 editorObject.gameObject.SetActive(false);
                 EditorManager.instance.curSelected.Remove(editorObject);
+                EditorManager.instance.selectableObjects.Remove(editorObject);
             }
         }
 

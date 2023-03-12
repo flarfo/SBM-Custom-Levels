@@ -40,6 +40,8 @@ namespace SBM_CustomLevels
             outline.OutlineWidth = 2f;
 
             outline.enabled = false;
+
+            EditorManager.instance.selectableObjects.Add(this);
         }
 
         private void OnMouseDown()

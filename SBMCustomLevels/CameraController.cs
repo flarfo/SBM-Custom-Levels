@@ -6,7 +6,7 @@ namespace SBM_CustomLevels
     [HarmonyPatch]
     internal class CameraController : MonoBehaviour
     {
-        private Camera camera;
+        public static Camera camera;
 
         private Vector3 panOrigin;
         private Vector3 lastPos;

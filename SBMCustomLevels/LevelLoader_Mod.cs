@@ -75,6 +75,8 @@ namespace SBM_CustomLevels
             MinecartRailHelper.railSplineTile = sbmBundle.LoadAsset<Mesh>("RailSplineTile");
             MinecartRailHelper.railMaterial = sbmBundle.LoadAsset<Material>("MinecartRail");
             MinecartRailHelper.railNodeHandle = sbmBundle.LoadAsset<GameObject>("RailNode");
+
+            sbmBundle.Unload(false);
         }
         
         public static void UpdateWorldsList()
@@ -83,7 +85,10 @@ namespace SBM_CustomLevels
 
             int count = 0;
 
-            foreach (string world in Directory.GetDirectories(levelsPath))
+            // order by creation time, a bad partial fix for alphabetical not being consistent when new worlds added
+            string[] worldDirectories = Directory.GetDirectories(levelsPath).OrderBy(p => new DirectoryInfo(p).CreationTime).ToArray();
+
+            foreach (string world in worldDirectories)
             {
                 if (count == maxWorlds)
                 {
@@ -91,7 +96,6 @@ namespace SBM_CustomLevels
                 }
 
                 List<string> levels = Directory.GetFiles(world, "*.sbm").ToList();
-
                 worldsList.Add(new Tuple<string, List<string>>(world, levels));
 
                 count++;
