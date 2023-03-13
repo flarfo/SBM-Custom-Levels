@@ -84,7 +84,7 @@ namespace SBM_CustomLevels
         }
 
         //searches all objects of specific name, returns object matching name if found
-        static GameObject FindInactiveGameObject(string name)
+        public static GameObject FindInactiveGameObject(string name)
         {
             GameObject[] objects = Resources.FindObjectsOfTypeAll<GameObject>();
 
@@ -100,7 +100,7 @@ namespace SBM_CustomLevels
         }
 
         //searches all objects of specific type and name, returns object matching name if found
-        static T FindInactiveGameObject<T>(string name) where T : UnityEngine.Object
+        public static T FindInactiveGameObject<T>(string name) where T : UnityEngine.Object
         {
             T[] objects = Resources.FindObjectsOfTypeAll<T>();
 

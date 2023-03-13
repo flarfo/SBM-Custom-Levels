@@ -13,6 +13,28 @@ namespace SBM_CustomLevels
     [HarmonyPatch]
     internal class Patches
     {
+		// fix for PlayerRoster profiles not being added when Level Editor button was selected. Roster is only updated when 
+		// the gamemode panel buttons are selected, so the game thinks there are no players to spawn in when a level is loaded.
+		// This brings the UI back to the main menu after leaving the level editor, instead of to the world select.
+        [HarmonyPatch(typeof(SBM.UI.MainMenu.StoryMode.UIStoryModeRagdolls), "LerpInRagdolls")]
+        [HarmonyPrefix]
+		static bool ReturnToMainMenuAfterLevelEditor()
+        {
+			if (LevelManager.lastLevelWasEditor)
+            {
+				GameObject.Find("Screen_StoryMode").SetActive(false);
+
+				var thing = MenuManager.FindInactiveGameObject<SBM.UI.Utilities.Focus.UIFocusable>("Screen_MainMenu");
+				thing.gameObject.SetActive(true);
+				thing.gameObject.GetComponent<SBM.UI.Utilities.Transitioner.UITransitioner>().Transition_In_From_Center();
+
+				LevelManager.lastLevelWasEditor = false;
+				return false;
+			}
+
+			return true;
+        }
+
 		private static IEnumerator WaitToEnableCollider(int frameCount, MeshCollider collider)
 		{
 			for (int i = 0; i < frameCount; i++)

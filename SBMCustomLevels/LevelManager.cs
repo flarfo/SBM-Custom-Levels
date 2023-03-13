@@ -23,6 +23,8 @@ namespace SBM_CustomLevels
 
         private int lastWorldStyle = 1;
 
+        public static bool lastLevelWasEditor = false;
+
         private static bool inLevel;
 
         public static bool InLevel
@@ -60,6 +62,8 @@ namespace SBM_CustomLevels
 
         private void LoadLevel(bool isEditor, bool newLevel, string path)
         {
+            lastLevelWasEditor = isEditor;
+
             //create a base scene in assetbundle
             AssetBundle sceneBundle = LevelLoader_Mod.GetAssetBundleFromResources("scene-bundle");
 
@@ -114,12 +118,12 @@ namespace SBM_CustomLevels
 
                     EditorManager.instance.editorCamera = Camera.main;
 
-                    Destroy(GameObject.Find("Player 1"));
+                    /*Destroy(GameObject.Find("Player 1"));
                     GameObject player2 = GameObject.Find("Player 2");
                     if (player2)
                     {
                         Destroy(player2);
-                    }
+                    }*/
 
                     SBM.Shared.Audio.AudioSystem.FadeOutMusicVolume();
                 }
