@@ -37,11 +37,11 @@ namespace SBM_CustomLevels
             railSpline.end = endNode;
 
             // first rail handle
-            MinecartRailNode point1 = CreateNodeHandle(rail.transform, startNode);
+            SplineNodeData point1 = CreateNodeHandle(rail.transform, startNode);
             point1.transform.localPosition = startPos;
 
             // second rail handle
-            MinecartRailNode point2 = CreateNodeHandle(rail.transform, endNode);
+            SplineNodeData point2 = CreateNodeHandle(rail.transform, endNode);
             point2.transform.localPosition = endPos;
 
             return rail;
@@ -72,7 +72,7 @@ namespace SBM_CustomLevels
 
                 if (isEditor)
                 {
-                    MinecartRailNode railNode = CreateNodeHandle(rail.transform, node);
+                    SplineNodeData railNode = CreateNodeHandle(rail.transform, node);
                     railNode.transform.localPosition = node.Position;
                 }
             }
@@ -80,24 +80,25 @@ namespace SBM_CustomLevels
             return rail;
         }
 
-        private static MinecartRailNode CreateNodeHandle(Transform parentRail, SplineNode node)
+        private static SplineNodeData CreateNodeHandle(Transform parentRail, SplineNode node)
         {
             GameObject nodeHandle = GameObject.Instantiate(railNodeHandle);
-            nodeHandle.name = "Node";
+            nodeHandle.name = "RailNode";
             nodeHandle.transform.parent = parentRail;
 
             nodeHandle.AddComponent<Outline>();
             nodeHandle.AddComponent<EditorSelectable>();
             nodeHandle.AddComponent<MeshCollider>();
 
-            MinecartRailNode railNode = nodeHandle.AddComponent<MinecartRailNode>();
-            railNode.railSpline = parentRail.GetComponent<Spline>();
+            SplineNodeData railNode = nodeHandle.AddComponent<SplineNodeData>();
+            railNode.doSmoothing = true;
+            railNode.spline = parentRail.GetComponent<Spline>();
             railNode.node = node;
             //make node a cube that renders on top
             return railNode;
         }
 
-        public static MinecartRailNode AddNodeAfterSelected(Spline spline, SplineNode selectedNode)
+        public static SplineNodeData AddNodeAfterSelected(Spline spline, SplineNode selectedNode)
         {
             SplineNode newNode = new SplineNode(selectedNode.Direction, selectedNode.Direction + selectedNode.Direction - selectedNode.Position);
             newNode.Up = selectedNode.Up;
@@ -113,7 +114,8 @@ namespace SBM_CustomLevels
                 spline.InsertNode(index + 1, newNode);
             }
 
-            MinecartRailNode node = CreateNodeHandle(spline.transform, newNode);
+            SplineNodeData node = CreateNodeHandle(spline.transform, newNode);
+            node.doSmoothing = true;
             node.transform.localPosition = selectedNode.Direction;
 
             return node;

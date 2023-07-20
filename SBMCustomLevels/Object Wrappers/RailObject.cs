@@ -21,7 +21,7 @@ namespace SBM_CustomLevels
         public RailObject(GameObject gameObject) : base(gameObject)
         {
             // preserve node order
-            List<SplineNode> splineNodes = gameObject.GetComponentsInChildren<MinecartRailNode>().Select(x => x.node).OrderBy(x => x.Position.x).ToList();
+            List<SplineNode> splineNodes = gameObject.GetComponentsInChildren<SplineNodeData>().Select(x => x.node).OrderBy(x => x.Position.x).ToList();
 
             nodes = new List<SplineNodeObject>();
 

@@ -30,6 +30,7 @@ namespace SBM_CustomLevels
 
         public bool selectTool = false;
         public bool moveTool = false;
+        public bool stampTool = false;
         private bool mouseUp = false;
 
         private Texture2D whiteTexture;
@@ -40,6 +41,8 @@ namespace SBM_CustomLevels
         private Vector2 snapVector = new Vector2(0, 0);
         public bool snapEnabled = false;
 
+        public EditorSelectable ghostItem = null;
+
         public Camera editorCamera;
 
         private GameObject editorUI;
@@ -48,21 +51,7 @@ namespace SBM_CustomLevels
 
         public static Mesh defaultCube;
 
-        private GameObject carrot;
-
-        public GameObject Carrot 
-        {
-            get
-            {
-                return carrot;
-            }
-            set
-            {
-                Destroy(carrot);
-
-                carrot = value;
-            }
-        }
+        public GameObject carrot;
 
         public GameObject wormhole;
         public GameObject spawn1;
@@ -240,7 +229,7 @@ namespace SBM_CustomLevels
                 foreach (EditorSelectable editorSelectable in curSelected)
                 {
                     // dont delete rail nodes, this should be managed by the minecart rail ui
-                    if (editorSelectable.gameObject.name == "Node")
+                    if (editorSelectable.gameObject.name.Contains("Node"))
                     {
                         editorSelectable.Selected = false;
                         continue;
@@ -254,6 +243,17 @@ namespace SBM_CustomLevels
                 UndoManager.AddUndo(UndoManager.UndoType.Delete, deletedObjects);
                 
                 curSelected.Clear();
+            }
+
+            // move ghostItem with mouse cursor
+            if (ghostItem)
+            {
+                ghostItem.MoveObjectToMouse(snapVector);
+
+                if (stampTool)
+                {
+                    ghostItem.SetInspectorInfo(true, false, false);
+                }
             }
 
             // if pointer is over UI, no need to check 3D world for input
@@ -279,6 +279,9 @@ namespace SBM_CustomLevels
 
                     curSelected.Clear();
                     EditorUI.instance.EnableInspector(false);
+                    EditorUI.instance.EnableObjSettingsUI(false);
+                    EditorUI.instance.EnableRailUI(false);
+                    EditorUI.instance.EnableWaterUI(false);
                 }
             }
 
@@ -297,6 +300,28 @@ namespace SBM_CustomLevels
                     dragPosition = Input.mousePosition;
 
                     SelectObject(ctrlClicked);
+                    return;
+                }
+
+                if (stampTool)
+                {
+                    // place current prefab
+                    if (ghostItem)
+                    {
+                        ghostItem.Selected = false;
+                        EditorSelectable newSelectable = Instantiate(ghostItem);
+
+                        if (ctrlClicked)
+                        {
+                            curSelected.Add(newSelectable);
+                            newSelectable.Selected = true;
+                        }
+
+                        ghostItem.Selected = true;
+
+                        UndoManager.AddUndo(UndoManager.UndoType.Place, new List<EditorSelectable> { newSelectable });
+                    }
+
                     return;
                 }
             }
@@ -373,7 +398,7 @@ namespace SBM_CustomLevels
             {
                 EditorSelectable hitSelectable;
 
-                if (hit.collider.transform.root && hit.collider.gameObject.name != "Node")
+                if (hit.collider.transform.root && !hit.collider.gameObject.name.Contains("Node"))
                 {
                     hitSelectable = hit.collider.transform.root.GetComponent<EditorSelectable>();
                 }
@@ -389,18 +414,23 @@ namespace SBM_CustomLevels
 
                 bool activateWaterUI = false;
                 bool activateRailUI = false;
+                bool activateObjSettingsUI = false;
 
-                //check if water/minecart to enable custom UI
+                //check if water/minecart/flipblock etc to enable custom UI
                 if (hitSelectable.GetComponent<FakeWater>())
                 {
                     activateWaterUI = true;
                 }
-                else if (hitSelectable.GetComponent<MinecartRailNode>())
+                else if (hitSelectable.GetComponent<SplineNodeData>() && hitSelectable.gameObject.name == "RailNode")
                 {
                     activateRailUI = true;
                 }
+                else if (hitSelectable.GetComponent<MeshSliceData>())
+                {
+                    activateObjSettingsUI = true;
+                }
 
-                //if control pressed, already selected objects will be deselected, nonselected objects will be appened to selection
+                //if control pressed, already selected objects will be deselected, nonselected objects will be appended to selection
                 if (ctrlClicked)
                 {
                     if (hitSelectable.Selected)
@@ -413,6 +443,7 @@ namespace SBM_CustomLevels
                             EditorUI.instance.EnableInspector(false);
                             EditorUI.instance.EnableWaterUI(false);
                             EditorUI.instance.EnableRailUI(false);
+                            EditorUI.instance.EnableObjSettingsUI(false);
 
                             EditorUI.instance.curWater = null;
                             EditorUI.instance.curRailNode = null;
@@ -437,11 +468,17 @@ namespace SBM_CustomLevels
 
                     if (activateRailUI)
                     {
-                        EditorUI.instance.curRailNode = hitSelectable.GetComponent<MinecartRailNode>();
+                        EditorUI.instance.curRailNode = hitSelectable.GetComponent<SplineNodeData>();
                         EditorUI.instance.SetRailInformation();
                         EditorUI.instance.EnableRailUI(true);
                     }
-                        
+                    
+                    if (activateObjSettingsUI)
+                    {
+                        EditorUI.instance.EnableObjSettingsUI(true);
+                        EditorUI.instance.SetObjSettingsInformation(hitSelectable.gameObject);
+                    }
+
                     return;
                 }
 
@@ -469,7 +506,7 @@ namespace SBM_CustomLevels
 
                 if (activateRailUI)
                 {
-                    EditorUI.instance.curRailNode = hitSelectable.GetComponent<MinecartRailNode>();
+                    EditorUI.instance.curRailNode = hitSelectable.GetComponent<SplineNodeData>();
                     EditorUI.instance.SetRailInformation();
                 }
                 else
@@ -477,10 +514,15 @@ namespace SBM_CustomLevels
                     EditorUI.instance.curRailNode = null;
                 }
 
+                if (activateObjSettingsUI)
+                {
+                    EditorUI.instance.SetObjSettingsInformation(hitSelectable.gameObject);
+                }
+
                 EditorUI.instance.EnableInspector(true);
                 EditorUI.instance.EnableWaterUI(activateWaterUI);
                 EditorUI.instance.EnableRailUI(activateRailUI);
-
+                EditorUI.instance.EnableObjSettingsUI(activateObjSettingsUI);
             }
         }
 
@@ -567,71 +609,259 @@ namespace SBM_CustomLevels
 
             ObjectContainer json = JsonConvert.DeserializeObject<ObjectContainer>(rawText);
 
-            Vector3 spawnPos_1 = json.spawnPosition1.GetPosition();
-            Vector3 spawnPos_2 = json.spawnPosition2.GetPosition();
+            Vector3 spawnPos_1;
+            Vector3 spawnPos_2;
 
-            foreach (DefaultObject defaultObject in json.defaultObjects) //itearate through default objects, instantiate based on name
+            try
             {
-                GameObject loadedObject;
-
-                if (defaultObject.objectName == "prefabs\\level\\world2\\IceSledSpikesGuide")
-                {
-                    loadedObject = Instantiate(iceSledSpikesGuide, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
-                }
-                else
-                {
-                    loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
-                }
-                
-                loadedObject.transform.localScale = defaultObject.GetScale();
-
-                if (defaultObject.objectName == "prefabs\\level\\Carrot")
-                {
-                    instance.Carrot = loadedObject;
-                }
-                else if (defaultObject.objectName == "prefabs\\level\\Wormhole")
-                {
-                    instance.wormhole = loadedObject;
-                }
-
-                AddColliderToObject(loadedObject);
-
-                loadedObject.AddComponent<Outline>();
-                loadedObject.AddComponent<EditorSelectable>();
-
-                if (loadedObject.layer == 10)
-                {
-                    loadedObject.layer = 0;
-                }
+                spawnPos_1 = json.spawnPosition1.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_1 in json! Setting to (0,0,0).");
+                spawnPos_1 = new Vector3(0, 0, 0);
             }
 
-            foreach (WaterObject waterObject in json.waterObjects) //iterate through water objects, apply separate water logic (height, width via component)
+            try
             {
-                GameObject loadedObject;
+                spawnPos_2 = json.spawnPosition2.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_2 in json! Setting to (1,0,0).");
+                spawnPos_2 = new Vector3(1, 0, 0);
+            }
+            
 
-                loadedObject = Instantiate(EditorManager.fakeWater, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation()));
+            try
+            {
+                foreach (DefaultObject defaultObject in json.defaultObjects) //itearate through default objects, instantiate based on name
+                {
+                    GameObject loadedObject;
 
-                loadedObject.transform.localScale = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1);
+                    // certain objects need to be recreated from a dummy object, loaded by bundle
+                    if (defaultObject.objectName == "prefabs\\level\\world2\\IceSledSpikesGuide")
+                    {
+                        loadedObject = Instantiate(iceSledSpikesGuide, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
+                    // certain objects have no meshrenderer, must be added with material for colors
+                    else if (defaultObject.objectName == "prefabs\\level\\KillBounds")
+                    {
+                        loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
 
-                Debug.Log(loadedObject.transform.localScale.ToString("F4"));
+                        Material mat = new Material(Shader.Find("Standard"));
+                        mat.color = Color.red;
+                        loadedObject.AddComponent<MeshRenderer>().material = mat;
+                    }
+                    else if (defaultObject.objectName == "prefabs\\level\\world3\\BoulderDestroyer")
+                    {
+                        loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
 
-                FakeWater fakeWater = loadedObject.GetComponent<FakeWater>();
-                fakeWater.width = waterObject.waterWidth;
-                fakeWater.height = waterObject.waterHeight;
-                fakeWater.keyframes = waterObject.keyframes;
+                        Material mat = new Material(Shader.Find("Standard"));
+                        mat.color = new Color(0.5f, 0, 0);
+                        loadedObject.AddComponent<MeshRenderer>().material = mat;
+                    }
+                    else
+                    {
+                        loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
 
-                loadedObject.AddComponent<Outline>();
-                loadedObject.AddComponent<EditorSelectable>();
+                    loadedObject.transform.localScale = defaultObject.GetScale();
+
+                    if (defaultObject.objectName == "prefabs\\level\\Carrot")
+                    {
+                        instance.carrot = loadedObject;
+                    }
+                    else if (defaultObject.objectName == "prefabs\\level\\Wormhole")
+                    {
+                        instance.wormhole = loadedObject;
+                    }
+
+                    AddColliderToObject(loadedObject);
+
+                    loadedObject.AddComponent<Outline>();
+                    loadedObject.AddComponent<EditorSelectable>();
+
+                    if (loadedObject.layer == 10)
+                    {
+                        loadedObject.layer = 0;
+                    }
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing defaultObjects in json!");
             }
 
-            foreach (RailObject railObject in json.railObjects)
+            try
             {
-                GameObject loadedObject = MinecartRailHelper.CreateRailFromObject(railObject, true);
+                foreach (WaterObject waterObject in json.waterObjects) //iterate through water objects, apply separate water logic (height, width via component)
+                {
+                    // if WaterTank, must work around MeshSliceAndStretch
+                    if (waterObject.w5)
+                    {
+                        Catobyte.Utilities.MeshSliceAndStretch loadedMeshSlice;
+                        loadedMeshSlice = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
 
-                loadedObject.AddComponent<Outline>();
-                loadedObject.AddComponent<EditorSelectable>();
+                        Destroy(loadedMeshSlice.transform.root.Find("Water_W5").gameObject);
+
+                        FakeWater fakeWaterTank = loadedMeshSlice.transform.root.gameObject.AddComponent<FakeWater>();
+
+                        fakeWaterTank.w5 = true;
+                        fakeWaterTank.width = waterObject.waterWidth;
+                        fakeWaterTank.height = waterObject.waterHeight;
+                        fakeWaterTank.keyframes = waterObject.keyframes;
+
+                        MeshSliceData meshData = loadedMeshSlice.transform.root.gameObject.AddComponent<MeshSliceData>();
+                        meshData.width = waterObject.waterWidth;
+                        meshData.height = waterObject.waterHeight;
+                        meshData.depth = 1;
+
+                        loadedMeshSlice.Size = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1.15f);
+                        loadedMeshSlice.Regenerate();
+
+                        loadedMeshSlice.transform.root.gameObject.AddComponent<Outline>();
+                        loadedMeshSlice.transform.root.gameObject.AddComponent<EditorSelectable>();
+
+                        continue;
+                    }
+
+                    GameObject loadedObject;
+                    loadedObject = Instantiate(EditorManager.fakeWater, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation()));
+
+                    loadedObject.transform.localScale = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1);
+
+                    Debug.Log(loadedObject.transform.localScale.ToString("F4"));
+
+                    FakeWater fakeWater = loadedObject.GetComponent<FakeWater>();
+                    fakeWater.width = waterObject.waterWidth;
+                    fakeWater.height = waterObject.waterHeight;
+                    fakeWater.keyframes = waterObject.keyframes;
+
+                    loadedObject.AddComponent<Outline>();
+                    loadedObject.AddComponent<EditorSelectable>();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing waterObjects in json!");
             }
 
+            try
+            {
+                foreach (MeshSliceObject meshSliceObject in json.meshSliceObjects) //iterate through mesh objects, apply logic (height, width via MeshSliceData component)
+                {
+                    Catobyte.Utilities.MeshSliceAndStretch loadedObject;
+
+                    loadedObject = Instantiate(Resources.Load(meshSliceObject.objectName) as GameObject, meshSliceObject.GetPosition(), Quaternion.Euler(meshSliceObject.GetRotation())).GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                    MeshSliceData meshData = loadedObject.transform.root.gameObject.AddComponent<MeshSliceData>();
+                    meshData.width = meshSliceObject.meshWidth;
+                    meshData.height = meshSliceObject.meshHeight;
+                    meshData.depth = meshSliceObject.meshDepth;
+
+                    loadedObject.Size = new Vector3(meshSliceObject.meshWidth, meshSliceObject.meshHeight, meshSliceObject.meshDepth);
+                    loadedObject.Regenerate();
+
+                    loadedObject.transform.root.gameObject.AddComponent<Outline>();
+                    loadedObject.transform.root.gameObject.AddComponent<EditorSelectable>();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing meshSliceObjects in json!");
+            }
+            
+            try
+            {
+                foreach (FlipBlockObject flipBlockObject in json.flipBlockObjects)
+                {
+                    GameObject loadedObject;
+
+                    loadedObject = Instantiate(Resources.Load(flipBlockObject.objectName) as GameObject, flipBlockObject.GetPosition(), Quaternion.Euler(flipBlockObject.GetRotation()));
+
+                    MeshSliceData meshData = loadedObject.transform.root.gameObject.AddComponent<MeshSliceData>();
+                    meshData.width = flipBlockObject.meshWidth;
+                    meshData.height = flipBlockObject.meshHeight;
+                    meshData.depth = flipBlockObject.meshDepth;
+
+                    Vector3 meshSize = new Vector3(flipBlockObject.meshWidth, flipBlockObject.meshHeight, flipBlockObject.meshDepth);
+
+                    var flipBlock = loadedObject.GetComponent<SBM.Objects.World5.FlipBlock>();
+                    flipBlock.spikesEnabled = flipBlockObject.spikesEnabled;
+
+                    for (int i = 0; i < flipBlock.spikesEnabled.Length; i++)
+                    {
+                        flipBlock.spikes[i].SetActive(flipBlock.spikesEnabled[i]);
+                    }
+
+                    flipBlock.timeBetweenFlips = flipBlockObject.flipTime;
+                    flipBlock.degreesPerFlip = flipBlockObject.flipDegrees;
+                    flipBlock.direction = flipBlockObject.direction ? SBM.Objects.World5.FlipBlock.FlipDirection.Right : SBM.Objects.World5.FlipBlock.FlipDirection.Left;
+
+                    var meshSlice = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+                    meshSlice.Size = meshSize;
+                    meshSlice.Regenerate();
+
+                    loadedObject.transform.root.gameObject.AddComponent<Outline>();
+                    loadedObject.transform.root.gameObject.AddComponent<EditorSelectable>();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing flipBlockObjects in json!");
+            }
+
+            try
+            {
+                foreach (PistonObject pistonObject in json.pistonObjects)
+                {
+                    GameObject loadedObject;
+
+                    loadedObject = Instantiate(Resources.Load(pistonObject.objectName) as GameObject, pistonObject.GetPosition(), Quaternion.Euler(pistonObject.GetRotation()));
+
+                    MeshSliceData meshData = loadedObject.transform.root.gameObject.AddComponent<MeshSliceData>();
+                    meshData.width = pistonObject.meshWidth;
+                    meshData.height = pistonObject.meshHeight;
+                    meshData.depth = pistonObject.meshDepth;
+
+                    Vector3 meshSize = new Vector3(pistonObject.meshWidth, pistonObject.meshHeight, pistonObject.meshDepth);
+
+                    var pistonPlatform = loadedObject.GetComponent<SBM.Objects.World5.PistonPlatform>();
+                    pistonPlatform.pistonMaxTravel = pistonObject.pistonMaxTravel;
+                    pistonPlatform.extraShaftLength = pistonObject.pistonShaftLength;
+
+                    pistonPlatform.regenerateNow = true;
+                    pistonPlatform.OnValidate();
+
+                    var meshSlice = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+                    meshSlice.Size = meshSize;
+                    meshSlice.Regenerate();
+
+                    loadedObject.transform.root.gameObject.AddComponent<Outline>();
+                    loadedObject.transform.root.gameObject.AddComponent<EditorSelectable>();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing pistonObjects in json!");
+            }
+
+            try
+            {
+                foreach (RailObject railObject in json.railObjects)
+                {
+                    GameObject loadedObject = MinecartRailHelper.CreateRailFromObject(railObject, true);
+
+                    loadedObject.AddComponent<Outline>();
+                    loadedObject.AddComponent<EditorSelectable>();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing railObjects in json!");
+            }
+           
             GameObject playerSpawn_1 = Instantiate(playerSpawn);
             playerSpawn_1.name = "PlayerSpawn_1";
             playerSpawn_1.transform.position = spawnPos_1;
@@ -770,7 +1000,7 @@ namespace SBM_CustomLevels
         /// <summary>
         /// Adds an undo event to the top of the undo stack.
         /// </summary
-        public static void AddUndo(UndoType undoType, List<EditorSelectable> editorObjects, bool wasRedo = false, MinecartRailNode railNode = null)
+        public static void AddUndo(UndoType undoType, List<EditorSelectable> editorObjects, bool wasRedo = false, SplineNodeData railNode = null)
         {
             if (!wasRedo)
             {
@@ -785,8 +1015,8 @@ namespace SBM_CustomLevels
             if (railNode)
             {
                 undo.railNode = railNode;
-                Debug.Log(railNode.railSpline.nodes.Count);
-                undo.railNodeIndex = railNode.railSpline.nodes.IndexOf(railNode.node);
+                Debug.Log(railNode.spline.nodes.Count);
+                undo.railNodeIndex = railNode.spline.nodes.IndexOf(railNode.node);
             }
 
             for (int i = 0; i < editorObjects.Count; i++)
@@ -906,7 +1136,7 @@ namespace SBM_CustomLevels
             AddRedo(UndoType.AddRailNode, new List<EditorSelectable>(undo.editorObjects), undo.railNode);
 
             undo.railNode.gameObject.SetActive(false);
-            undo.railNode.railSpline.RemoveNode(undo.railNode.node);
+            undo.railNode.spline.RemoveNode(undo.railNode.node);
         }
 
         /// <summary>
@@ -919,13 +1149,13 @@ namespace SBM_CustomLevels
 
             undo.railNode.gameObject.SetActive(true);
             
-            if (undo.railNode.railSpline.nodes.Count <= undo.railNodeIndex)
+            if (undo.railNode.spline.nodes.Count <= undo.railNodeIndex)
             {
-                undo.railNode.railSpline.AddNode(undo.railNode.node);
+                undo.railNode.spline.AddNode(undo.railNode.node);
             }
             else
             {
-                undo.railNode.railSpline.InsertNode(undo.railNodeIndex, undo.railNode.node);
+                undo.railNode.spline.InsertNode(undo.railNodeIndex, undo.railNode.node);
             }
         }
         #endregion
@@ -935,7 +1165,7 @@ namespace SBM_CustomLevels
         /// Adds a redo event to the top of the redo stack.
         /// If the object is to be destroyed, call this method BEFORE the destruction.
         /// </summary
-        private static void AddRedo(UndoType undoType, List<EditorSelectable> editorObjects, MinecartRailNode railNode = null)
+        private static void AddRedo(UndoType undoType, List<EditorSelectable> editorObjects, SplineNodeData railNode = null)
         {
             UndoStruct redo = new UndoStruct();
             redo.undoType = undoType;
@@ -945,7 +1175,7 @@ namespace SBM_CustomLevels
             if (railNode)
             {
                 redo.railNode = railNode;
-                redo.railNodeIndex = railNode.railSpline.nodes.IndexOf(railNode.node);
+                redo.railNodeIndex = railNode.spline.nodes.IndexOf(railNode.node);
             }
 
             for (int i = 0; i < editorObjects.Count; i++)
@@ -1065,12 +1295,12 @@ namespace SBM_CustomLevels
         private static void RedoAddRailNode(UndoStruct redo)
         {
             // spline cannot have fewer than two nodes
-            if (redo.railNode.railSpline.nodes.Count > 2)
+            if (redo.railNode.spline.nodes.Count > 2)
             {
                 AddUndo(UndoType.AddRailNode, new List<EditorSelectable>(redo.editorObjects), true, redo.railNode);
 
                 redo.railNode.gameObject.SetActive(true);
-                redo.railNode.railSpline.InsertNode(redo.railNodeIndex, redo.railNode.node);
+                redo.railNode.spline.InsertNode(redo.railNodeIndex, redo.railNode.node);
             }
         }
 
@@ -1079,7 +1309,7 @@ namespace SBM_CustomLevels
             AddUndo(UndoType.DeleteRailNode, new List<EditorSelectable>(redo.editorObjects), true, redo.railNode);
 
             redo.railNode.gameObject.SetActive(false);
-            redo.railNode.railSpline.RemoveNode(redo.railNode.node);
+            redo.railNode.spline.RemoveNode(redo.railNode.node);
         }
         #endregion
 
@@ -1099,7 +1329,7 @@ namespace SBM_CustomLevels
             public List<UndoObject> undoObjects;
 
             // minecart raile specific, can be ignored otherwise
-            public MinecartRailNode railNode;
+            public SplineNodeData railNode;
             public int railNodeIndex;
         }
 

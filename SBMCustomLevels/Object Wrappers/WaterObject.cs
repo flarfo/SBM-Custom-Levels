@@ -11,6 +11,8 @@ namespace SBM_CustomLevels
         public float waterHeight;
         public float waterWidth;
 
+        public bool w5;
+
         public List<Keyframe> keyframes;
 
         [JsonConstructor]
@@ -25,6 +27,8 @@ namespace SBM_CustomLevels
 
             waterHeight = fakeWater.height;
             waterWidth = fakeWater.width;
+
+            w5 = fakeWater.w5;
 
             keyframes = fakeWater.keyframes;
         }

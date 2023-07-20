@@ -24,6 +24,7 @@ namespace SBM_CustomLevels
         private int lastWorldStyle = 1;
 
         public static bool lastLevelWasEditor = false;
+        public static bool loading = false;
 
         private static bool inLevel;
 
@@ -79,6 +80,7 @@ namespace SBM_CustomLevels
                 sceneBundle.Unload(true);
 
                 Scene sceneByName = SceneManager.GetSceneByName("base level");
+                SceneSystem.CurrentScene = sceneByName;
 
                 foreach (GameObject gameObject in SceneManager.GetSceneByName("Systems").GetRootGameObjects())
                 {
@@ -102,9 +104,14 @@ namespace SBM_CustomLevels
                     }
 
                     EditorManager.instance.InitializeEditor();
+
+                    loading = false;
                 }
                 else
                 {
+                    // ensure a mismatch between remote user and local client, 255 tells us that this is a custom level
+                    SceneSystem.TargetSceneIndex = 255;
+
                     lastWorldStyle = worldStyle;
                     worldStyle = LoadJSONLevel(path);
                 }
@@ -141,9 +148,16 @@ namespace SBM_CustomLevels
                         playIntro = false;
                     }
 
-                    SBM.Shared.Audio.AudioSystem.instance.ScheduleSong(song, playIntro);
+                    SBM.Shared.Audio.AudioSystem.ScheduleSong(song, playIntro);
                 }
             };
+
+            // random GO called "Button Blocker" that blocks some of the UI buttons (don't know why it even exists)
+            GameObject buttonBlocker = GameObject.Find("Button Blocker");
+            if (buttonBlocker)
+            {
+                buttonBlocker.SetActive(false);
+            }
         }
 
         /*private void LoadLevel(bool isEditor, bool newLevel, string path)
@@ -222,6 +236,7 @@ namespace SBM_CustomLevels
             }
 
             string rawText = File.ReadAllText(path);
+
             int worldStyle = (int)char.GetNumericValue(rawText[0]);
             rawText = rawText.Remove(0, 1);
 
@@ -229,44 +244,202 @@ namespace SBM_CustomLevels
 
             ObjectContainer json = JsonConvert.DeserializeObject<ObjectContainer>(rawText);
 
-            Vector3 spawnPos_1 = json.spawnPosition1.GetPosition();
-            Vector3 spawnPos_2 = json.spawnPosition2.GetPosition();
+            Vector3 spawnPos_1;
+            Vector3 spawnPos_2;
 
-            foreach (DefaultObject defaultObject in json.defaultObjects) //itearate through default objects, instantiate based on name
+            try
             {
-                GameObject loadedObject;
-
-                loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
-                loadedObject.transform.localScale = defaultObject.GetScale();
+                spawnPos_1 = json.spawnPosition1.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_1 in json! Setting to (0,0,0).");
+                spawnPos_1 = new Vector3(0, 0, 0);
             }
 
-            foreach (WaterObject waterObject in json.waterObjects) //iterate through water objects, apply separate water logic (height, width via component)
+            try
             {
-                SBM.Shared.Utilities.Water.Water loadedObject;
+                spawnPos_2 = json.spawnPosition2.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_2 in json! Setting to (1,0,0).");
+                spawnPos_2 = new Vector3(1, 0, 0);
+            }
 
-                curWaterHeight = waterObject.waterHeight;
-                curWaterWidth = waterObject.waterWidth;
-
-                loadedObject = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponent<SBM.Shared.Utilities.Water.Water>();
-
-                if (waterObject.keyframes.Count > 0)
+            try
+            {
+                foreach (DefaultObject defaultObject in json.defaultObjects) //itearate through default objects, instantiate based on name
                 {
-                    loadedObject.AnimateWaterHeight = true;
-                    loadedObject.WaterHeightVsTime = new AnimationCurve(waterObject.keyframes.ToArray());
+                    GameObject loadedObject;
+
+                    loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    loadedObject.transform.localScale = defaultObject.GetScale();
                 }
-                //further logic in Patches.InitializeWaterValues
             }
-
-            foreach (RailObject railObject in json.railObjects)
+            catch
             {
-                GameObject rail = MinecartRailHelper.CreateRailFromObject(railObject, false);
+                Debug.LogError("Missing defaultObjects in json! Instantiating default carrot and wormhole!");
+
+                Instantiate(Resources.Load(RecordLevel.NameToPath("Carrot")));
+                GameObject wormhole = Instantiate(Resources.Load(RecordLevel.NameToPath("Wormhole"))) as GameObject;
+                wormhole.transform.position = new Vector3(5, 0, 0);
+            }
+            try
+            {
+                foreach (WaterObject waterObject in json.waterObjects) //iterate through water objects, apply separate water logic (height, width via component)
+                {
+                    SBM.Shared.Utilities.Water.Water loadedObject;
+
+                    curWaterHeight = waterObject.waterHeight;
+                    curWaterWidth = waterObject.waterWidth;
+
+                    if (waterObject.w5)
+                    {
+                        //Destroy(loadedObject.transform.Find("Water_W5").gameObject);
+                        loadedObject = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponentInChildren<SBM.Shared.Utilities.Water.Water>();
+
+                        var meshSlice = loadedObject.transform.root.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                        meshSlice.Size = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1.15f);
+                        meshSlice.Regenerate();
+                    }
+                    else
+                    {
+                        loadedObject = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponent<SBM.Shared.Utilities.Water.Water>();
+                    }
+
+                    if (waterObject.keyframes.Count > 0)
+                    {
+                        loadedObject.AnimateWaterHeight = true;
+                        loadedObject.WaterHeightVsTime = new AnimationCurve(waterObject.keyframes.ToArray());
+                    }
+
+                    //further logic in Patches.InitializeWaterValues
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing waterObjects in json!");
             }
 
+            try
+            {
+                foreach (MeshSliceObject meshSliceObject in json.meshSliceObjects) //iterate through mesh objects, apply logic (height, width via MeshSliceData component)
+                {
+                    GameObject loadedObject;
+
+                    loadedObject = Instantiate(Resources.Load(meshSliceObject.objectName) as GameObject, meshSliceObject.GetPosition(), Quaternion.Euler(meshSliceObject.GetRotation()));
+
+                    Vector3 meshSize = new Vector3(meshSliceObject.meshWidth, meshSliceObject.meshHeight, meshSliceObject.meshDepth);
+
+                    if (meshSliceObject.objectName.Contains("SeeSaw"))
+                    {
+                        var seeSaw = loadedObject.GetComponent<SBM.Objects.World5.SeeSaw>();
+                        seeSaw.platformSize = meshSize;
+                        seeSaw.Regenerate();
+                    }
+
+                    var meshSlice = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                    meshSlice.Size = meshSize;
+                    meshSlice.Regenerate();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing meshSliceObjects in json!");
+            }
+
+            try
+            {
+                foreach (FlipBlockObject flipBlockObject in json.flipBlockObjects)
+                {
+                    GameObject loadedObject;
+
+                    loadedObject = Instantiate(Resources.Load(flipBlockObject.objectName) as GameObject, flipBlockObject.GetPosition(), Quaternion.Euler(flipBlockObject.GetRotation()));
+
+                    Vector3 meshSize = new Vector3(flipBlockObject.meshWidth, flipBlockObject.meshHeight, flipBlockObject.meshDepth);
+
+                    var flipBlock = loadedObject.GetComponent<SBM.Objects.World5.FlipBlock>();
+                    flipBlock.spikesEnabled = flipBlockObject.spikesEnabled;
+
+                    for (int i = 0; i < flipBlock.spikesEnabled.Length; i++)
+                    {
+                        flipBlock.spikes[i].SetActive(flipBlock.spikesEnabled[i]);
+                    }
+
+                    flipBlock.timeBetweenFlips = flipBlockObject.flipTime;
+                    flipBlock.degreesPerFlip = flipBlockObject.flipDegrees;
+                    flipBlock.direction = flipBlockObject.direction ? SBM.Objects.World5.FlipBlock.FlipDirection.Right : SBM.Objects.World5.FlipBlock.FlipDirection.Left;
+
+                    var meshSlice = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+                    meshSlice.Size = meshSize;
+                    meshSlice.Regenerate();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing flipBlockObjects in json!");
+            }
+
+            try
+            {
+                foreach (PistonObject pistonObject in json.pistonObjects)
+                {
+                    GameObject loadedObject;
+
+                    loadedObject = Instantiate(Resources.Load(pistonObject.objectName) as GameObject, pistonObject.GetPosition(), Quaternion.Euler(pistonObject.GetRotation()));
+
+                    MeshSliceData meshData = loadedObject.transform.root.gameObject.AddComponent<MeshSliceData>();
+                    meshData.width = pistonObject.meshWidth;
+                    meshData.height = pistonObject.meshHeight;
+                    meshData.depth = pistonObject.meshDepth;
+
+                    Vector3 meshSize = new Vector3(pistonObject.meshWidth, pistonObject.meshHeight, pistonObject.meshDepth);
+
+                    var pistonPlatform = loadedObject.GetComponent<SBM.Objects.World5.PistonPlatform>();
+                    pistonPlatform.pistonMaxTravel = pistonObject.pistonMaxTravel;
+                    pistonPlatform.extraShaftLength = pistonObject.pistonShaftLength;
+
+                    pistonPlatform.regenerateNow = true;
+                    pistonPlatform.OnValidate();
+
+                    var meshSlice = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+                    meshSlice.Size = meshSize;
+                    meshSlice.Regenerate();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing pistonObjects in json!");
+            }
+
+            try
+            {
+                foreach (RailObject railObject in json.railObjects)
+                {
+                    GameObject rail = MinecartRailHelper.CreateRailFromObject(railObject, false);
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing railObjects in json!");
+            }
+            
             GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_1.transform.position = spawnPos_1;
 
             GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_2.transform.position = spawnPos_2;
+
+            if (SBM.Shared.Networking.NetworkSystem.IsInSession)
+            {
+                SBM.Shared.Networking.NetworkSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
+                SBM.Shared.Level.LevelSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
+            }
+
+            loading = false;
 
             return worldStyle;
         }
@@ -282,6 +455,13 @@ namespace SBM_CustomLevels
             {
                 throw new Exception("Empty level attempted to load! Make sure to save in editor first.");
             }
+
+            if (loading)
+            {
+                return;
+            }
+
+            loading = true;
 
             PreviousSceneName = SceneManager.GetActiveScene().name;
 
@@ -366,7 +546,7 @@ namespace SBM_CustomLevels
                     bg = Instantiate(Resources.Load<GameObject>(Path.Combine("prefabs", "level", "world4", "World4_BG")));
                     break;
                 case 5:
-                    RenderSettings.skybox = LevelLoader_Mod.skyboxWorld1;
+                    RenderSettings.skybox = LevelLoader_Mod.skyboxWorld5;
                     bg = Instantiate(Resources.Load<GameObject>(Path.Combine("prefabs", "level", "world5", "World5_BG")));
                     break;
                 default:

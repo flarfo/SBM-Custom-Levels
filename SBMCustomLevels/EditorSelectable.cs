@@ -34,7 +34,10 @@ namespace SBM_CustomLevels
         //apply outline
         void Awake()
         {
-            outline = GetComponent<Outline>();
+            if (!outline)
+            {
+                outline = GetComponent<Outline>();
+            }
 
             outline.OutlineColor = new Color32(255, 0, 203, 255);
             outline.OutlineWidth = 2f;
@@ -42,6 +45,11 @@ namespace SBM_CustomLevels
             outline.enabled = false;
 
             EditorManager.instance.selectableObjects.Add(this);
+        }
+
+        void OnDestroy()
+        {
+            EditorManager.instance.selectableObjects.Remove(this);
         }
 
         private void OnMouseDown()
@@ -88,6 +96,46 @@ namespace SBM_CustomLevels
             }
         }
 
+        public void MoveObjectToMouse(Vector2 snapVector)
+        {
+            Vector3 mousePos = Input.mousePosition;
+            mousePos.z = Mathf.Abs(EditorManager.instance.editorCamera.transform.position.z - transform.position.z);
+            Vector3 pos = EditorManager.instance.editorCamera.ScreenToWorldPoint(mousePos);
+
+            Vector3 finalPosition;
+
+            if (EditorManager.instance.snapEnabled)
+            {
+                Vector2 snappedPos = new Vector3();
+                
+                if (snapVector.x == 0)
+                {
+                    snappedPos.x = pos.x;
+                }
+                else
+                {
+                    snappedPos.x = Mathf.Round(pos.x / snapVector.x) * snapVector.x;
+                }
+
+                if (snapVector.y == 0)
+                {
+                    snappedPos.y = pos.y;
+                }
+                else
+                {
+                    snappedPos.y = Mathf.Round(pos.y / snapVector.y) * snapVector.y;
+                }
+
+                finalPosition = new Vector3(snappedPos.x, snappedPos.y, transform.position.z);
+            }
+            else
+            {
+                finalPosition = new Vector3(pos.x, pos.y, transform.position.z);
+            }
+
+            transform.position = finalPosition;
+        }
+
         public void SetMouseOffset()
         {
             zCoord = EditorManager.instance.editorCamera.WorldToScreenPoint(transform.position).z;
@@ -95,7 +143,7 @@ namespace SBM_CustomLevels
             mouseOffset = gameObject.transform.position - GetMouseWorldPos();
         }
 
-        Vector3 GetMouseWorldPos()
+        private Vector3 GetMouseWorldPos()
         {
             Vector3 mousePoint = Input.mousePosition;
 
@@ -107,7 +155,7 @@ namespace SBM_CustomLevels
         /// <summary>
         /// Sets inspector UI information based on this objects transform.
         /// </summary>
-        public void SetInspectorInfo()
+        public void SetInspectorInfo(bool updatePosition = true, bool updateRotation = true, bool updateScale = true)
         {
             bool multiple = false;
 
@@ -117,9 +165,21 @@ namespace SBM_CustomLevels
             }
 
             EditorUI.instance.SetInspectorName(gameObject.name, multiple);
-            EditorUI.instance.SetInspectorPosition(transform.position, multiple);
-            EditorUI.instance.SetInspectorRotation(transform.rotation.eulerAngles, multiple);
-            EditorUI.instance.SetInspectorScale(transform.localScale, multiple);
+
+            if (updatePosition)
+            {
+                EditorUI.instance.SetInspectorPosition(transform.position, multiple);
+            }
+
+            if (updateRotation)
+            {
+                EditorUI.instance.SetInspectorRotation(transform.rotation.eulerAngles, multiple);
+            }
+            
+            if (updateScale)
+            {
+                EditorUI.instance.SetInspectorScale(transform.localScale, multiple);
+            }
         }
     }
 }

@@ -34,7 +34,7 @@ namespace SBM_CustomLevels
         //private GameObject addToWorldUI;
         //private Text addToWorldText;
 
-        private string selectedWorld;
+        private World selectedWorld;
         private bool worldsSelectsCreated = false;
 
         private int worldCount = 0;
@@ -128,18 +128,18 @@ namespace SBM_CustomLevels
                 world.gameObject.SetActive(false); //disable all previously activated world gameobjects
             }
 
-            foreach (Tuple<string, List<string>> world in LevelLoader_Mod.worldsList) //create world selection UI
+            foreach (World world in LevelLoader_Mod.worldsList) //create world selection UI
             {
                 GameObject worldObject = customWorlds.group[count].gameObject;
                 worldObject.SetActive(true);
 
-                worldObject.GetComponentInChildren<Text>().text = world.Item1.Split(Path.DirectorySeparatorChar).Last();
+                worldObject.GetComponentInChildren<Text>().text = world.Name;
 
-                if (world.Item2.Count == 0)
+                if (world.levels.Count == 0)
                 {
                     worldObject.GetComponentInChildren<UI.Components.RawImageUVScroll>().gameObject.GetComponent<RawImage>().color = new Color32(255, 10, 0, 255); // red
                 }
-                else if (world.Item2.Count >= LevelLoader_Mod.maxLevels)
+                else if (world.levels.Count >= LevelLoader_Mod.maxLevels)
                 {
                     worldObject.GetComponentInChildren<UI.Components.RawImageUVScroll>().gameObject.GetComponent<RawImage>().color = new Color32(0, 205, 30, 255); // green
                 }
@@ -151,16 +151,16 @@ namespace SBM_CustomLevels
                 worldObject.GetComponent<UIFocusable>().onSubmitSuccess.RemoveAllListeners();
                 worldObject.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
                 {
-                    selectedWorld = world.Item1;
+                    selectedWorld = world;
 
-                    if (world.Item2.Count > 0)
+                    if (world.levels.Count > 0)
                     {
                         customWorldSelector.GetComponent<UITransitioner>().Transition_Out_To_Right();
                         customLevelSelector.GetComponent<UITransitioner>().Transition_In_From_Top();
                     }
                     else
                     {
-                        instance.CreateNewLevel(world.Item1);
+                        instance.CreateNewLevel(world);
                         return;
                     }
 
@@ -172,7 +172,7 @@ namespace SBM_CustomLevels
                     }
 
                     int count2 = 0;
-                    foreach (string level in world.Item2) //create level selection ui
+                    foreach (string level in world.levels) //create level selection ui
                     {
                         if (count2 >= LevelLoader_Mod.maxLevels)
                         {
@@ -213,17 +213,13 @@ namespace SBM_CustomLevels
             UIFocusableGroup customLevels = customLevelSelector.GetComponent<UIFocusableGroup>();
             List<string> levels = new List<string>();
 
-            foreach (Tuple<string, List<string>> world in LevelLoader_Mod.worldsList)
+            if (selectedWorld == null)
             {
-                if (world.Item1 == selectedWorld)
-                {
-                    levels = world.Item2;
-                    break;
-                }
+                return;
             }
 
             int count = 0;
-            foreach (string level in levels) //create level selection ui
+            foreach (string level in selectedWorld.levels) //create level selection ui
             {
                 print("TEST!");
 
@@ -255,9 +251,11 @@ namespace SBM_CustomLevels
 
                 count++;
             }
+
+            customLevels.FocusOnGroupMember(0);
         }
 
-        private void CreateNewWorld(string worldPath)
+        private void CreateNewWorld(World world)
         {;
             //worldCount + 6, initially there are 5 worlds
             //worldCount + 5, world 1 is set at position 0
@@ -323,20 +321,24 @@ namespace SBM_CustomLevels
             
             GameObject customWorldName = Instantiate(worldName_1, worldName_1.transform.parent);
             customWorldName.name = "Text_WorldTitle_" + (worldCount + 6);
-            customWorldName.SetActive(false);
-            customWorldName.GetComponent<Text>().text = worldPath.Split('\\').Last();
+
+            Destroy(customWorldName.GetComponent<UnityEngine.Localization.PropertyVariants.GameObjectLocalizer>());
+            Destroy(customWorldName.GetComponent<UnityEngine.Localization.Components.LocalizeStringEvent>());
+            customWorldName.GetComponent<Text>().text = world.Name;
             
+            customWorldName.SetActive(false);
+
             worldNamesTransitioner.transitioners = worldNamesTransitioner.transitioners.Append(customWorldName.GetComponent<UITransitioner>()).ToArray();
 
             worldCount++;
         }
 
-        private void CreateNewLevel(string worldPath)
+        private void CreateNewLevel(World world)
         {
-            string[] levels = Directory.GetFiles(worldPath);
+            //string[] levels = Directory.GetFiles(worldPath);
             string levelName = "";
 
-            for (int i = 0; i < levels.Length + 1; i++)
+            for (int i = 0; i < world.levels.Count + 1; i++)
             {
                 Debug.Log(i);
 
@@ -345,37 +347,26 @@ namespace SBM_CustomLevels
                     return;
                 }
 
-                if (!File.Exists(Path.Combine(worldPath, (i + 1).ToString() + ".sbm")))
+                if (!File.Exists(Path.Combine(world.worldPath, (i + 1).ToString() + ".sbm")))
                 {
                     levelName = (i + 1).ToString() + ".sbm";
 
-                    Debug.Log("success");
+                    Debug.Log("Success! Level created at: " + levelName);
 
                     break;
                 }
             }
 
-            string path = Path.Combine(worldPath, levelName);
+            string path = Path.Combine(world.worldPath, levelName);
 
             if (path.IndexOfAny(Path.GetInvalidPathChars()) == -1 && !File.Exists(path))
             {
                 using (File.Create(path)) { }
-                //TODO: get and update XML file when creating a new level
+
+                selectedWorld.UpdateLevels();
 
                 instance.UpdateWorldButtons();
                 instance.UpdateLevelButtons();
-            }
-        }
-
-        //TODO: make faster, fully implement
-        private void CreateCFG(string worldPath) //creates .cfg file for storing world data 
-        {
-            Config config = new Config();
-            XmlSerializer xmlSerializer = new XmlSerializer(typeof(Config));
-            
-            using (TextWriter textWriter = new StreamWriter(Path.Combine(worldPath, "world.cfg")))
-            {
-                xmlSerializer.Serialize(textWriter, config);
             }
         }
 
@@ -392,13 +383,15 @@ namespace SBM_CustomLevels
                 return;
             }
 
+            World world = new World(worldName);
+
             if (worldsSelectsCreated)
             {
-                instance.CreateNewWorld(path);
+                instance.CreateNewWorld(world);
             }
             
             //instance.CreateCFG(path);
-            instance.CreateNewLevel(path);
+            instance.CreateNewLevel(world);
 
             LevelLoader_Mod.UpdateWorldsList();
 
@@ -411,9 +404,9 @@ namespace SBM_CustomLevels
         {
             GameObject levelSelector = FindInactiveGameObject("Level Selector");
 
-            foreach (Tuple<string, List<string>> world in LevelLoader_Mod.worldsList)
+            foreach (World world in LevelLoader_Mod.worldsList)
             {
-                instance.CreateNewWorld(world.Item1);
+                instance.CreateNewWorld(world);
             }
 
             foreach (UIFocusable level in levelSelector.GetComponent<UIFocusableGroup>().group)
@@ -468,7 +461,7 @@ namespace SBM_CustomLevels
             UIFocusable addLevelButton = GameObject.Find("AddLevelButton").GetComponent<UIFocusable>();
             addLevelButton.onSubmitSuccess.AddListener(delegate
             {
-                if (selectedWorld != string.Empty)
+                if (selectedWorld != null)
                 {
                     CreateNewLevel(selectedWorld);
                 }
@@ -499,7 +492,7 @@ namespace SBM_CustomLevels
             {
                 return;
             }
-
+            
             AssetBundle uiBundle = LevelLoader_Mod.GetAssetBundleFromResources("ui-bundle");
 
             GameObject editorButton = Instantiate(uiBundle.LoadAsset<GameObject>("Button_LevelEditor"));
@@ -507,7 +500,7 @@ namespace SBM_CustomLevels
             editorButton.transform.localPosition = new Vector3(87, -124.5f, 0);
             editorButton.transform.localScale = Vector3.one;
             editorButton.GetComponent<SoftMask>().defaultShader = Shader.Find("Hidden/UI Default (Soft Masked)");
-
+            
             RectTransform partyButton = __instance.gameObject.GetComponent<RectTransform>();
 
             GameObject emptyGO = new GameObject();
@@ -517,33 +510,37 @@ namespace SBM_CustomLevels
             partyButton.localScale = new Vector3(300 / partyButton.sizeDelta.x, 1, 1);
             partyButton.localPosition = new Vector3(-140, -124.5f, 0);
             emptyGO.transform.localScale = new Vector3(1 / partyButton.localScale.x, 1, 0);
-
+            
             foreach (Transform child in partyButton)
             {
                 child.gameObject.AddComponent<SoftMaskable>();
             }
-
+            
             Transform buttonContainer = partyButton.transform.parent;
-
+            
             UIFocusable coopFocusable = buttonContainer.GetChild(1).gameObject.GetComponent<UIFocusable>();
             UIFocusable partyFocusable = buttonContainer.GetChild(2).gameObject.GetComponent<UIFocusable>();
             UIFocusable settingsFocusable = buttonContainer.GetChild(3).gameObject.GetComponent<UIFocusable>();
             UIFocusable quitFocusable = buttonContainer.GetChild(4).gameObject.GetComponent<UIFocusable>();
-
+            
             UIFocusable editorFocusable = editorButton.GetComponent<UIFocusable>();
             editorFocusable.navTargetLeft = partyFocusable;
             editorFocusable.navTargetRight = settingsFocusable;
             editorFocusable.navTargetUp = coopFocusable;
-
+            
             coopFocusable.navTargetDown = editorFocusable;
             partyFocusable.navTargetRight = editorFocusable;
             settingsFocusable.navTargetLeft = editorFocusable;
             quitFocusable.navTargetLeft = editorFocusable;
 
+            if (instance == null)
+            {
+                instance = new MenuManager();
+            }
+            
             instance.levelEditorButton = editorFocusable;
-
+            
             uiBundle.Unload(false);
-
             instance.CreateMenuUI();
         }
 
@@ -590,7 +587,8 @@ namespace SBM_CustomLevels
 
             if (index >= 5) //if custom world, adjust level numbers
             {
-                int levelCount = LevelLoader_Mod.worldsList[index - 5].Item2.Count;
+                __instance.worldIndex = index;
+                int levelCount = LevelLoader_Mod.worldsList[index - 5].levels.Count;
                 
                 for (int i = 0; i < levelCount; i++)
                 {
@@ -603,8 +601,11 @@ namespace SBM_CustomLevels
 
                     levelButton.levelLock.SetActive(false);
                     levelButton.SetLevelNumber(i + 1);
-                    levelButton.GetComponent<CustomLevelID>().ID = LevelLoader_Mod.worldsList[index - 5].Item2[i];
-                    levelButton.GetComponent<CustomLevelID>().levelNumber = i+1;
+
+                    CustomLevelID levelID = levelButton.GetComponent<CustomLevelID>();
+                    levelID.ID = LevelLoader_Mod.worldsList[index - 5].levels[i];
+                    levelID.world = LevelLoader_Mod.worldsList[index - 5];
+                    levelID.GetComponent<CustomLevelID>().levelNumber = i+1;
 
                     levelButton.gameObject.SetActive(true);
                 }
@@ -644,13 +645,23 @@ namespace SBM_CustomLevels
         {
             if (instance.selectedWorldIndex >= 5) //if custom world selected, load custom level
             {
-                if (b.GetComponent<CustomLevelID>().ID == "NULL LEVEL") //if custom world has no levels, this button is the "No Levels" button - should not enter a level
+                CustomLevelID levelID = b.GetComponent<CustomLevelID>();
+                if (levelID.ID == "NULL LEVEL") //if custom world has no levels, this button is the "No Levels" button - should not enter a level
                 {
                     return false;
                 }
                 try
                 {
-                    LevelManager.instance.BeginLoadLevel(false, false, b.GetComponent<CustomLevelID>().ID, b.GetComponent<CustomLevelID>().levelNumber);
+                    if (SBM.Shared.Networking.NetworkSystem.IsInSession)
+                    {
+                        // send world identifier to all other players when in network. levelID.levelNumber - 1, since levelID.levelNumber starts at 1 rather than 0.
+                        MultiplayerManager.SendCustomLevelData(levelID.world.WorldHash, levelID.levelNumber - 1);
+                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber);
+                    }
+                    else
+                    {
+                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber);
+                    }
 
                     return false;
                 }
@@ -694,6 +705,7 @@ namespace SBM_CustomLevels
     {
         private string id;
         public int levelNumber;
+        public World world;
 
         public string ID
         {

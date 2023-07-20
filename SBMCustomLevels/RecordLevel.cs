@@ -44,14 +44,15 @@ namespace SBM_CustomLevels
         "Beachball", "BeachBarrel", "BeachPlant", "BeachQuarterCircle", "BeachQuarterCircle_Cave", "BeachQuarterPipe", "BeachQuarterPipe_Cave", "BeachRock", "BeachRock_RB",
         "Block_W4", "Block_W4_1x1_CurvedBottom", "Block_W4_Corner", "Boardwalk", "Coconut", "Coral", "DetailRock", "FloatingPlatform", "FloatingPlatform_Small",
         "GrassBeach_Corner_1x1_45deg_Right_Endcap", "GrassBeach_Endcap_1x1", "GrassBeach_Endcap_Left", "GrassBeach_Endcap_Right", "GrassBeach_MidBlock", "HibiscusBush",
-        "JetSki", "LevelLight_World4", "PalmTree", "Parasol", "SeaLeaf", "SeaMine", "Seashell", "Seaweed", "TreasureChest", "Water", "World4_BG" };
+        "JetSki", "LevelLight_World4", "PalmTree", "Parasol", "SeaLeaf", "SeaMine", "Seashell", "Seaweed", "TreasureChest", "Water_W4", "World4_BG" };
 
         //prefabs stored in the Resources/prefabs/level/world5 folder
-        static List<string> world5Contents = new List<string>{ "Billboard", "BumperBar", "BumperBarSpinWheel", "BumperPad", "BumperPadJumbo", "BumperSpinner", "BumperSpinnerJumbo",
-        "BumperSpinnerPlatform", "BurningPlatform", "Crowd", "CrowdSingle", "DirtBike", "FireLightPrefab", "HopBars", "HotdogKart", "LevelBlock_W5", "Masher", "RingOfFire",
-        "Rope", "RopeSwingPendulum", "CrossPipe", "ScaffoldForwardPipeRemover", "Scaffolding", "ScaffoldPanel", "ScaffoldPanel_RB", "ScaffoldPanelDestroyer",
-        "ScaffoldPanelSpline", "ScaffoldPipeExtra", "ScaffoldPipeExtraDouble", "ScaffoldPipeSpline", "SparkShower", "Spotlight", "SwingingPlatform", "TrackingSpotlight",
-        "World5_BG", "WorldBG_5_old" }; //may not work with scaffolding, objects are inside another folder ("scaffolding")
+        static List<string> world5Contents = new List<string>{ "BalanceBall", "BumperBar", "BumperBarSpinWheel", "BumperPad", "BumperPadJumbo", "BumperSpinner", "BumperSpinnerJumbo",
+        "BumperSpinnerPlatform", "ConveyorBelt", "DirtBike", "FireLightPrefab", "Flamethrower", "Flamethrowers_Decorative", "FlipBlock", "FloppyObstacle", "FloppyRod", 
+        "HalfCircleSpongeyBlock", "HopBars", "HotdogKart", "HotdogKart_Rocket Variant", "PistonPlatform", "Pivot", "RingOfFire", "SeeSaw", "Signpost_W5_Arrow",
+        "Signpost_W5_Death", "SlipNSlide", "CrossPipe", "ScaffoldForwardPipeRemover", "Scaffolding", "ScaffoldPanel", "ScaffoldPanel_RB", "ScaffoldPanelDestroyer",
+        "ScaffoldPanelSpline", "ScaffoldPipeExtra", "ScaffoldPipeExtraDouble", "ScaffoldPipeSpline", "SparkShower", "Spotlight", "Spotlight_SurfaceMount", "SteamMachine", "StiffRod", "SupportPole", 
+        "TrackingSpotlight", "WaterTank", "World5_BG" }; //may not work with scaffolding, objects are inside another folder ("scaffolding")
         #endregion
 
         public static void RecordJSONLevel()
@@ -69,6 +70,9 @@ namespace SBM_CustomLevels
         {
             List<DefaultObject> defaultObjects = new List<DefaultObject>();
             List<WaterObject> waterObjects = new List<WaterObject>();
+            List<MeshSliceObject> meshSliceObjects = new List<MeshSliceObject>();
+            List<FlipBlockObject> flipBlockObjects = new List<FlipBlockObject>();
+            List<PistonObject> pistonObjects = new List<PistonObject>();
             List<RailObject> railObjects = new List<RailObject>();
 
             string worldStyle = EditorManager.instance.worldStyle.ToString();
@@ -93,6 +97,18 @@ namespace SBM_CustomLevels
                 {
                     railObjects.Add(new RailObject(objects[i].gameObject));
                 }
+                else if (objectName.Contains("SeeSaw") || objectName.Contains("StiffRod"))
+                {
+                    meshSliceObjects.Add(new MeshSliceObject(objects[i].gameObject));
+                }
+                else if (objectName.Contains("FlipBlock"))
+                {
+                    flipBlockObjects.Add(new FlipBlockObject(objects[i].gameObject));
+                }
+                else if (objectName.Contains("PistonPlatform"))
+                {
+                    pistonObjects.Add(new PistonObject(objects[i].gameObject));
+                }
                 else if (objectName != string.Empty && objectName != "Node")
                 {
                     defaultObjects.Add(new DefaultObject(objects[i].gameObject));
@@ -101,7 +117,7 @@ namespace SBM_CustomLevels
 
             string filePath = Path.Combine(LevelLoader_Mod.levelsPath, EditorManager.instance.selectedLevel);
 
-            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, defaultObjects, waterObjects, railObjects), Formatting.Indented) });
+            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, defaultObjects, waterObjects, meshSliceObjects, flipBlockObjects, pistonObjects, railObjects), Formatting.Indented) });
         }
 
         public static string NameToPath(string goName)

@@ -78,6 +78,7 @@ namespace SBM_CustomLevels
             {
 				EditorManager.InEditor = false;
 				LevelManager.InLevel = false;
+				LevelManager.loading = false;
 			}
         }
 
@@ -96,6 +97,22 @@ namespace SBM_CustomLevels
 
 			LevelManager.instance.StartCoroutine(WaitToEnableCollider(1, newCollider));
 		}
+
+		// boulder spawners have .spawningEnabled set to false by default & the built-in method for enabling does not work for custom levels -- fixes
+        [HarmonyPatch(typeof(SBM.Objects.World3.Boulder.BoulderSpawner), "OnGameManagerRoundStateSet")]
+        [HarmonyPostfix]
+		static void FixBoulderSpawning(SBM.Objects.World3.Boulder.BoulderSpawner __instance, SBM.Shared.RoundState state)
+        {
+			if (!LevelManager.InLevel)
+            {
+				return;
+            }
+
+			if (state == SBM.Shared.RoundState.Started)
+            {
+				__instance.spawningEnabled = true;
+            }
+        }
 
 		[HarmonyPatch(typeof(SBM.Shared.Utilities.Water.Water), "OnValidate")]
         [HarmonyPrefix]
@@ -196,10 +213,37 @@ namespace SBM_CustomLevels
 				return true;
 			}
 
-			__instance.height = LevelManager.instance.curWaterHeight;
-			__instance.width = LevelManager.instance.curWaterWidth;
+			if (__instance.transform.root.TryGetComponent(out SBM.Objects.World5.WaterTank waterTank))
+            {
+				waterTank.tankSize = new Vector2(LevelManager.instance.curWaterWidth, LevelManager.instance.curWaterHeight);
 
-			__instance.GetComponent<MeshFilter>().mesh = EditorManager.defaultCube;
+				float num = waterTank.tankSize.x - waterTank.tankMargins.x;
+				float num2 = waterTank.tankSize.y - waterTank.tankMargins.y;
+				float num3 = 0.5f * waterTank.tankSize.x;
+				float num4 = 0.5f * waterTank.tankSize.y;
+
+				waterTank.tank.Size = new Vector3(num, num2, 1.15f);
+				//waterTank.tank.transform.localPosition = new Vector3(num3, num4, 0f);
+				waterTank.tank.GetComponent<MeshCollider>().sharedMesh = waterTank.tank.GetComponent<MeshFilter>().sharedMesh;
+
+				__instance.width = num;
+				__instance.height = num2 + waterTank.waterTopInset;
+
+				//0.05f - (waterTank.tankSize.x - 3) * .5f
+				//x-pos: at 4 width, should be -.45 -- at 2 width, should be .55 -- 3 width should be 0.05 -- 8.63 width, should be -2.75
+				//y-pos: (0.5f * waterTank.tankMargins.y) - 0.5f * (waterTank.tankSize.y - 1)
+				//derived from observing change in water position based on initial tank size,
+				//then relating correct water position with the incorrect water position
+				waterTank.water.transform.localPosition = new Vector3(0.05f - (waterTank.tankSize.x - 3) * .5f, (0.5f * waterTank.tankMargins.y) - 0.5f * (waterTank.tankSize.y - 1), 0f);
+				waterTank.water.transform.localScale = new Vector3(1f, 1f, 1.05f);
+			}
+            else
+            {
+				__instance.height = LevelManager.instance.curWaterHeight;
+				__instance.width = LevelManager.instance.curWaterWidth;
+			}
+
+			//__instance.GetComponent<MeshFilter>().mesh = EditorManager.defaultCube;
 			__instance.OnValidate();
 
 			LevelManager.instance.curWaterHeight = 0;
@@ -207,6 +251,27 @@ namespace SBM_CustomLevels
 
 			return true;
 		}
+
+		// if last focused button in group exceeds number of custom levels (e.g. 10 levels in a default world, custom world only has 2 levels)
+		// set focus to first level, so that a non-active button is not focused
+
+        [HarmonyPatch(typeof(SBM.UI.MainMenu.StoryMode.UIStoryLevelButtons), "FocusLastPlayedLevelButtonOrDefault")]
+        [HarmonyPrefix]
+		static bool FocusFirstLevelIfCustom(SBM.UI.MainMenu.StoryMode.UIStoryLevelButtons __instance)
+        {
+			Debug.Log(__instance.worldIndex);
+			if (__instance.worldIndex >= 5)
+            {
+				Debug.Log("Custom World! Focusing level 1.");
+
+				var focusableGroup = __instance.GetComponent<SBM.UI.Utilities.Focus.UIFocusableGroup>();
+				focusableGroup.OverrideIndexOfPrevGroupFocus(0);
+
+				return false;
+			}
+            
+			return true;
+        }
 
 		[HarmonyPatch(typeof(SBM.UI.Game.StoryMode.UIStoryLevelName), "Start")]
 		[HarmonyPrefix]
@@ -278,6 +343,25 @@ namespace SBM_CustomLevels
 		static bool StopGetTimeRecord()
         {
 			return !LevelManager.InLevel && !EditorManager.InEditor; 
+        }
+
+		// normal SBM.Objects.GameModes.Story.GameManagerStory.Start() tries to access current level via LevelSystem.GetLevelBySceneName(),
+		// however for custom levels no scene exists.
+		[HarmonyPatch(typeof(SBM.Objects.GameModes.Story.GameManagerStory), "Start")]
+        [HarmonyPrefix]
+		static bool FixGameStartPatch(SBM.Objects.GameModes.Story.GameManagerStory __instance)
+        {
+			if (LevelManager.InLevel)
+            {
+				SBM.Shared.Cameras.TrackingCamera.ScheduleCenterOnTargets();
+
+				SBM.Shared.WorldResetHandler.ScanForResettables();
+				SBM.Shared.GameManager.Instance.ResetRound(false, 0f);
+
+				return false;
+			}
+
+			return true;
         }
 
 		// dont unlock badges for custom levels (which don't have normal badges) /// NullReferenceException

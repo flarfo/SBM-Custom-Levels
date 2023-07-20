@@ -19,7 +19,7 @@ namespace SBM_CustomLevels
 
         public static string levelsPath = Path.Combine(Path.GetDirectoryName(Application.dataPath), "levels");
 
-        public static List<Tuple<string, List<string>>> worldsList = new List<Tuple<string, List<string>>>();
+        public static List<World> worldsList = new List<World>();
 
         public static readonly int maxLevels = 10;
         public static readonly int maxWorlds = 16;
@@ -28,8 +28,7 @@ namespace SBM_CustomLevels
         public static Material skyboxWorld2;
         public static Material skyboxWorld3;
         public static Material skyboxWorld4;
-
-        public static Material colliderRenderMat;
+        public static Material skyboxWorld5;
 
         //initialize plugin and start harmony
         private void Awake()
@@ -62,8 +61,9 @@ namespace SBM_CustomLevels
             skyboxWorld2 = sbmBundle.LoadAsset<Material>("Skybox_World2");
             skyboxWorld3 = sbmBundle.LoadAsset<Material>("Skybox_World3");
             skyboxWorld4 = sbmBundle.LoadAsset<Material>("Skybox_World4");
+            skyboxWorld5 = sbmBundle.LoadAsset<Material>("Skybox_World5");
 
-            EditorManager.fakeWater = sbmBundle.LoadAsset<GameObject>("Water");
+            EditorManager.fakeWater = sbmBundle.LoadAsset<GameObject>("Water_W4");
             EditorManager.fakeWater.AddComponent<FakeWater>();
 
             EditorManager.iceSledSpikesGuide = sbmBundle.LoadAsset<GameObject>("IceSledSpikesGuide");
@@ -86,17 +86,17 @@ namespace SBM_CustomLevels
             int count = 0;
 
             // order by creation time, a bad partial fix for alphabetical not being consistent when new worlds added
-            string[] worldDirectories = Directory.GetDirectories(levelsPath).OrderBy(p => new DirectoryInfo(p).CreationTime).ToArray();
-
-            foreach (string world in worldDirectories)
+            foreach (string worldPath in Directory.GetDirectories(levelsPath).OrderBy(p => new DirectoryInfo(p).CreationTime))
             {
                 if (count == maxWorlds)
                 {
                     break;
                 }
 
-                List<string> levels = Directory.GetFiles(world, "*.sbm").ToList();
-                worldsList.Add(new Tuple<string, List<string>>(world, levels));
+                //List<string> levels = Directory.GetFiles(world, "*.sbm").ToList();
+                string worldName = new DirectoryInfo(worldPath).Name;
+
+                worldsList.Add(new World(worldName));
 
                 count++;
             }
@@ -141,6 +141,97 @@ namespace SBM_CustomLevels
             }
 
             return bundle;
+        }
+    }
+
+    public sealed class World
+    {
+        public List<string> levels = new List<string>();
+        public string worldPath;
+
+        private string _name;
+        public string Name
+        {
+            get { return _name; }
+
+            set
+            {
+                _name = value;
+
+                _worldHash = GetHashFromName();
+            }
+        }
+
+        private ulong _worldHash;
+        public ulong WorldHash 
+        {
+            get { return _worldHash; }
+        }
+
+        public World(string name)
+        {
+            Name = name;
+            worldPath = Path.Combine(LevelLoader_Mod.levelsPath, name);
+            UpdateLevels();
+        }
+
+        public void UpdateLevels()
+        {
+            levels = Directory.GetFiles(worldPath, "*.sbm").ToList();
+        }
+
+        private ulong GetHashFromName()
+        {
+            string hash = "";
+            char[] name;
+
+            if (Name.Length > 18)
+            {
+                name = Name.Take(18).ToArray();
+            }
+            else
+            {
+                name = Name.ToArray();
+            }
+
+            // convert name to list of integers
+            for (int i = 0; i < name.Length; i++)
+            {
+                char c = name[i];
+                int addedValue = 0;
+                int value;
+
+                if (char.IsLetter(c))
+                {
+                    // convert character to its alphabetical position 'A' = 0, 'B' = 1, ...
+                    value = char.ToUpper(c) - 65;
+                    // if greater than 9, overflow back to 0, since 9 is largest single digit integer.
+                    value = (value + addedValue) % 9;
+                }
+                else if (char.IsDigit(c))
+                {
+                    value = (int)char.GetNumericValue(c);
+                }
+                else if (char.IsWhiteSpace(name[i - 1]))
+                {
+                    value = 0;
+                }
+                else
+                {
+                    continue;
+                }
+
+                hash += value;
+            }
+
+            // add 'salt' to ensure numerically equivalent names don't produce the same hash. 
+            ulong total = 0;
+            for (int i = 0; i < hash.Length; i++)
+            {
+                total += (ulong)char.GetNumericValue(hash[0]);
+            }
+
+            return ulong.Parse(hash) + total;
         }
     }
 }
