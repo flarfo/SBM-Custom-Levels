@@ -161,7 +161,8 @@
     <Compile Include="SBMCustomLevels\EditorManager.cs" />
     <Compile Include="SBMCustomLevels\EditorSelectable.cs" />
     <Compile Include="SBMCustomLevels\EditorUI.cs" />
-    <Compile Include="SBMCustomLevels\FakeWater.cs" />
+    <Compile Include="SBMCustomLevels\PistonDataContainer.cs" />
+    <Compile Include="SBMCustomLevels\WaterDataContainer.cs" />
     <Compile Include="SBMCustomLevels\MenuManager.cs" />
     <Compile Include="SBMCustomLevels\MeshSliceData.cs" />
     <Compile Include="SBMCustomLevels\MinecartRailHelper.cs" />

@@ -226,6 +226,20 @@ namespace SBM_CustomLevels
 
                 List<EditorSelectable> deletedObjects = new List<EditorSelectable>();
 
+                if (ghostItem)
+                {
+                    if (ghostItem.isActiveAndEnabled)
+                    {
+
+                        ghostItem.Selected = false;
+                        curSelected.Remove(ghostItem);
+                        selectableObjects.Remove(ghostItem);
+                        Destroy(ghostItem.gameObject);
+
+                        ghostItem = null;
+                    }
+                }
+
                 foreach (EditorSelectable editorSelectable in curSelected)
                 {
                     // dont delete rail nodes, this should be managed by the minecart rail ui
@@ -308,8 +322,20 @@ namespace SBM_CustomLevels
                     // place current prefab
                     if (ghostItem)
                     {
+                        EditorSelectable newSelectable;
                         ghostItem.Selected = false;
-                        EditorSelectable newSelectable = Instantiate(ghostItem);
+                        
+                        // minecart rails must be spawned using helper function, otherwise they won't work as intended
+                        if (ghostItem.name == "MinecartRail")
+                        {
+                             GameObject newRail = MinecartRailHelper.SpawnNewRail(ghostItem.transform.position);
+                            newRail.AddComponent<Outline>();
+                             newSelectable = newRail.AddComponent<EditorSelectable>();
+                        }
+                        else
+                        {
+                            newSelectable = Instantiate(ghostItem);
+                        }
 
                         if (ctrlClicked)
                         {
@@ -414,12 +440,18 @@ namespace SBM_CustomLevels
 
                 bool activateWaterUI = false;
                 bool activateRailUI = false;
+                bool activatePistonUI = false;
                 bool activateObjSettingsUI = false;
 
                 //check if water/minecart/flipblock etc to enable custom UI
-                if (hitSelectable.GetComponent<FakeWater>())
+                if (hitSelectable.GetComponent<WaterDataContainer>())
                 {
                     activateWaterUI = true;
+                }
+                else if (hitSelectable.GetComponent<PistonDataContainer>())
+                {
+                    activatePistonUI = true;
+                    activateObjSettingsUI = true;
                 }
                 else if (hitSelectable.GetComponent<SplineNodeData>() && hitSelectable.gameObject.name == "RailNode")
                 {
@@ -442,10 +474,12 @@ namespace SBM_CustomLevels
                         {
                             EditorUI.instance.EnableInspector(false);
                             EditorUI.instance.EnableWaterUI(false);
+                            EditorUI.instance.EnablePistonUI(false);
                             EditorUI.instance.EnableRailUI(false);
                             EditorUI.instance.EnableObjSettingsUI(false);
 
                             EditorUI.instance.curWater = null;
+                            EditorUI.instance.curPiston = null;
                             EditorUI.instance.curRailNode = null;
 
                             return;
@@ -461,9 +495,16 @@ namespace SBM_CustomLevels
 
                     if (activateWaterUI)
                     {
-                        EditorUI.instance.curWater = hitSelectable.GetComponent<FakeWater>();
+                        EditorUI.instance.curWater = hitSelectable.GetComponent<WaterDataContainer>();
                         EditorUI.instance.SetWaterKeyframes();
                         EditorUI.instance.EnableWaterUI(true);
+                    }
+
+                    if (activatePistonUI)
+                    {
+                        EditorUI.instance.curPiston = hitSelectable.GetComponent<PistonDataContainer>();
+                        EditorUI.instance.SetPistonKeyframes();
+                        EditorUI.instance.EnablePistonUI(true);
                     }
 
                     if (activateRailUI)
@@ -496,12 +537,22 @@ namespace SBM_CustomLevels
 
                 if (activateWaterUI)
                 {
-                    EditorUI.instance.curWater = hitSelectable.GetComponent<FakeWater>();
+                    EditorUI.instance.curWater = hitSelectable.GetComponent<WaterDataContainer>();
                     EditorUI.instance.SetWaterKeyframes();
                 }
                 else
                 {
                     EditorUI.instance.curWater = null;
+                }
+
+                if (activatePistonUI)
+                {
+                    EditorUI.instance.curPiston = hitSelectable.GetComponent<PistonDataContainer>();
+                    EditorUI.instance.SetPistonKeyframes();
+                }
+                else
+                {
+                    EditorUI.instance.curPiston = null;
                 }
 
                 if (activateRailUI)
@@ -521,6 +572,7 @@ namespace SBM_CustomLevels
 
                 EditorUI.instance.EnableInspector(true);
                 EditorUI.instance.EnableWaterUI(activateWaterUI);
+                EditorUI.instance.EnablePistonUI(activatePistonUI);
                 EditorUI.instance.EnableRailUI(activateRailUI);
                 EditorUI.instance.EnableObjSettingsUI(activateObjSettingsUI);
             }
@@ -705,7 +757,7 @@ namespace SBM_CustomLevels
 
                         Destroy(loadedMeshSlice.transform.root.Find("Water_W5").gameObject);
 
-                        FakeWater fakeWaterTank = loadedMeshSlice.transform.root.gameObject.AddComponent<FakeWater>();
+                        WaterDataContainer fakeWaterTank = loadedMeshSlice.transform.root.gameObject.AddComponent<WaterDataContainer>();
 
                         fakeWaterTank.w5 = true;
                         fakeWaterTank.width = waterObject.waterWidth;
@@ -733,7 +785,7 @@ namespace SBM_CustomLevels
 
                     Debug.Log(loadedObject.transform.localScale.ToString("F4"));
 
-                    FakeWater fakeWater = loadedObject.GetComponent<FakeWater>();
+                    WaterDataContainer fakeWater = loadedObject.GetComponent<WaterDataContainer>();
                     fakeWater.width = waterObject.waterWidth;
                     fakeWater.height = waterObject.waterHeight;
                     fakeWater.keyframes = waterObject.keyframes;
@@ -830,6 +882,9 @@ namespace SBM_CustomLevels
                     var pistonPlatform = loadedObject.GetComponent<SBM.Objects.World5.PistonPlatform>();
                     pistonPlatform.pistonMaxTravel = pistonObject.pistonMaxTravel;
                     pistonPlatform.extraShaftLength = pistonObject.pistonShaftLength;
+
+                    PistonDataContainer pistonData = loadedObject.AddComponent<PistonDataContainer>();
+                    pistonData.keyframes = pistonObject.keyframes;
 
                     pistonPlatform.regenerateNow = true;
                     pistonPlatform.OnValidate();

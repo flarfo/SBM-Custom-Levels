@@ -64,7 +64,7 @@ namespace SBM_CustomLevels
             skyboxWorld5 = sbmBundle.LoadAsset<Material>("Skybox_World5");
 
             EditorManager.fakeWater = sbmBundle.LoadAsset<GameObject>("Water_W4");
-            EditorManager.fakeWater.AddComponent<FakeWater>();
+            EditorManager.fakeWater.AddComponent<WaterDataContainer>();
 
             EditorManager.iceSledSpikesGuide = sbmBundle.LoadAsset<GameObject>("IceSledSpikesGuide");
             EditorManager.playerSpawn = sbmBundle.LoadAsset<GameObject>("PlayerSpawn");
@@ -198,7 +198,6 @@ namespace SBM_CustomLevels
             for (int i = 0; i < name.Length; i++)
             {
                 char c = name[i];
-                int addedValue = 0;
                 int value;
 
                 if (char.IsLetter(c))
@@ -206,21 +205,60 @@ namespace SBM_CustomLevels
                     // convert character to its alphabetical position 'A' = 0, 'B' = 1, ...
                     value = char.ToUpper(c) - 65;
                     // if greater than 9, overflow back to 0, since 9 is largest single digit integer.
-                    value = (value + addedValue) % 9;
+                    value %= 9;
                 }
                 else if (char.IsDigit(c))
                 {
                     value = (int)char.GetNumericValue(c);
                 }
-                else if (char.IsWhiteSpace(name[i - 1]))
+                else if (char.IsWhiteSpace(c))
                 {
                     value = 0;
+                }
+                else if (char.IsSymbol(c))
+                {
+                    // INVALID: <>:"/\|?*
+                    // use most common symbols for unique number identities
+                    switch(c)
+                    {
+                        case '!':
+                            value = 1;
+                            break;
+                        case '_':
+                            value = 1;
+                            break;
+                        case '#':
+                            value = 2;
+                            break;
+                        case '$':
+                            value = 3;
+                            break;
+                        case '+':
+                            value = 4;
+                            break;
+                        case '^':
+                            value = 5;
+                            break;
+                        case '&':
+                            value = 6;
+                            break;
+                        case '(':
+                            value = 7;
+                            break;
+                        case ')':
+                            value = 8;
+                            break;
+                        case '-':
+                            value = 9;
+                            break;
+                        default:
+                            continue;
+                    }
                 }
                 else
                 {
                     continue;
                 }
-
                 hash += value;
             }
 
@@ -228,10 +266,17 @@ namespace SBM_CustomLevels
             ulong total = 0;
             for (int i = 0; i < hash.Length; i++)
             {
-                total += (ulong)char.GetNumericValue(hash[0]);
+                total += (ulong)char.GetNumericValue(hash[i]);
             }
 
-            return ulong.Parse(hash) + total;
+            ulong final = ulong.Parse(hash) + total;
+
+            if (final > ulong.MaxValue)
+            {
+                final = ulong.MaxValue - total;
+            }
+
+            return final;
         }
     }
 }

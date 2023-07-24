@@ -69,6 +69,16 @@ namespace SBM_CustomLevels
                 Debug.Log("CUSTOM WORLD: " + sceneData.world);
                 Debug.Log("CUSTOM LEVEL: " + sceneData.level);
 
+                // escape condition if nonexistant level loads or other fault in transmitting level
+                if (sceneData.level == ushort.MaxValue)
+                {
+                    if (LevelManager.InLevel)
+                    {
+                        SBM.Shared.SceneSystem.LoadScene("Menu");
+                        return;
+                    }
+                }
+
                 World receivedWorld = null;
 
                 foreach (World world in LevelLoader_Mod.worldsList)
@@ -81,11 +91,26 @@ namespace SBM_CustomLevels
 
                 if (receivedWorld == null)
                 {
+                    if (LevelManager.InLevel)
+                    {
+                        SBM.Shared.SceneSystem.LoadScene("Menu");
+                    }
+
                     Debug.Log("World not found! Potential mismatch between client and server?");
                     return;
                 }
+                else if (sceneData.level > receivedWorld.levels.Count - 1)
+                {
+                    if (LevelManager.InLevel)
+                    {
+                        SBM.Shared.SceneSystem.LoadScene("Menu");
+                    }
 
-                LevelManager.instance.BeginLoadLevel(false, false, receivedWorld.levels[sceneData.level], sceneData.level); // add isNetworkClient ? 
+                    Debug.Log("Level not found! Potential mismatch between client and server?");
+                    return;
+                }
+
+                LevelManager.instance.BeginLoadLevel(false, false, receivedWorld.levels[sceneData.level], sceneData.level + 1, receivedWorld); // add isNetworkClient ? 
                 // send callback confirming load, THEN activate network ?
             }
         }
@@ -99,9 +124,13 @@ namespace SBM_CustomLevels
         // GameManagerStory needs to start round!
         // NetworkSystem.SceneIsSyncedWithRemoteUsers is FALSE! GameManager yields null until this is TRUE!
 
+        // if (custom level to be loaded)
         public static void SendCustomLevelData(ulong world, int level)
         {
-            // if (custom level to be loaded)
+            if (!Network.Session.Exists)
+            {
+                return;
+            }
 
             CustomSceneData sceneData = new CustomSceneData();
             sceneData.world = world;

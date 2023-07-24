@@ -5,6 +5,7 @@ using Newtonsoft.Json.Serialization;
 using System.Collections;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using System;
 using System.Reflection;
 using SplineMesh;
@@ -42,6 +43,7 @@ namespace SBM_CustomLevels
 
         public int levelNumber;
         public string currentLevel;
+        public World currentWorld;
 
         public string PreviousSceneName { get; private set; }
 
@@ -402,6 +404,16 @@ namespace SBM_CustomLevels
                     pistonPlatform.pistonMaxTravel = pistonObject.pistonMaxTravel;
                     pistonPlatform.extraShaftLength = pistonObject.pistonShaftLength;
 
+                    if (pistonObject.keyframes.Count > 0)
+                    {
+                        pistonPlatform.movement = true;
+                        pistonPlatform.normalizedLengthVsTime = new AnimationCurve(pistonObject.keyframes.ToArray());
+                    }
+                    else
+                    {
+                        pistonPlatform.movement = false;
+                    }
+
                     pistonPlatform.regenerateNow = true;
                     pistonPlatform.OnValidate();
 
@@ -444,7 +456,7 @@ namespace SBM_CustomLevels
             return worldStyle;
         }
 
-        public void BeginLoadLevel(bool isEditor, bool newLevel, string path, int level)
+        public void BeginLoadLevel(bool isEditor, bool newLevel, string path, int level, World world = null)
         {
             if (!File.Exists(path))
             {
@@ -472,6 +484,11 @@ namespace SBM_CustomLevels
 
             if (!isEditor)
             {
+                if (world != null)
+                {
+                    currentWorld = world;
+                }
+
                 currentLevel = path;
 
                 if (!LevelManager.InLevel)
@@ -510,11 +527,11 @@ namespace SBM_CustomLevels
 
             if (currentLevel != null)
             {
-                FileInfo[] levelPaths = Directory.GetParent(currentLevel).GetFiles("*.sbm");
+                List<string> levelPaths = currentWorld.levels;
 
-                if (levelPaths.Length-1 > levelNumber-1) // if next level exists... levelNumber-1 since level number is + 1.
+                if (levelPaths.Count-1 > levelNumber-1) // if next level exists... levelNumber-1 since level number is + 1.
                 {
-                    nextLevel = levelPaths[levelNumber].ToString();
+                    nextLevel = levelPaths[levelNumber];
                 }
 
                 levelNumber++;

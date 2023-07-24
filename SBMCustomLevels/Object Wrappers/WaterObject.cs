@@ -23,7 +23,7 @@ namespace SBM_CustomLevels
 
         public WaterObject(GameObject gameObject) : base(gameObject)
         {
-            FakeWater fakeWater = gameObject.GetComponent<FakeWater>();
+            WaterDataContainer fakeWater = gameObject.GetComponent<WaterDataContainer>();
 
             waterHeight = fakeWater.height;
             waterWidth = fakeWater.width;

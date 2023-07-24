@@ -35,27 +35,30 @@ namespace SBM_CustomLevels
 
         private GameObject inspectorUI;
         private GameObject waterUI;
+        private GameObject pistonUI;
         private GameObject railUI;
         private GameObject objSettingsUI;
 
-        public FakeWater curWater;
-        private RectTransform keyframeContainer;
+        public WaterDataContainer curWater;
+        public PistonDataContainer curPiston;
+        private RectTransform waterKeyframeContainer;
+        private RectTransform pistonKeyframeContainer;
         private Vector2 defaultKeyframeContainerSize = new Vector2(100, 168);
-        private readonly int maxWaterKeyframes = 16;
+        private readonly int maxKeyframes = 16;
 
         public SplineNodeData curRailNode;
         public InputField[] railPositionField;
         public InputField[] railDirectionField;
         public InputField[] railUpField;
 
-        public GameObject flipBlockContainer;
+        public GameObject flipBlockSettingsContainer;
         public Toggle flipBlockSpikes;
         public InputField flipBlockDegrees;
         public InputField flipBlockTime;
         public Button[] flipBlockDirection;
         private GameObject[] flipBlockCheckmarks = new GameObject[2];
 
-        public GameObject pistonPlatformContainer;
+        public GameObject pistonSettingsContainer;
         public InputField pistonMaxTravel;
         public InputField pistonShaftLength;
 
@@ -132,8 +135,8 @@ namespace SBM_CustomLevels
                 Destroy(this);
             }
 
-            flipBlockContainer = GameObject.Find("FlipBlockContainer");
-            pistonPlatformContainer = GameObject.Find("PistonContainer");
+            flipBlockSettingsContainer = GameObject.Find("FlipBlockSettingsContainer");
+            pistonSettingsContainer = GameObject.Find("PistonSettingsContainer");
 
             nameField = GameObject.Find("NameText").GetComponent<Text>();
             positionField = GameObject.Find("PositionContainer").GetComponentsInChildren<InputField>();
@@ -147,16 +150,21 @@ namespace SBM_CustomLevels
 
             inspectorUI = GameObject.Find("Inspector");
             waterUI = GameObject.Find("WaterContainer");
+            pistonUI = GameObject.Find("PistonContainer");
             railUI = GameObject.Find("RailContainer");
             objSettingsUI = GameObject.Find("ObjectSettingsContainer");
 
-            keyframeContainer = GameObject.Find("KeyframeContainer").GetComponent<RectTransform>();
+            waterKeyframeContainer = GameObject.Find("WaterKeyframeContainer").GetComponent<RectTransform>();
+            pistonKeyframeContainer = GameObject.Find("PistonKeyframeContainer").GetComponent<RectTransform>();
 
             GameObject inspectorDragBar = inspectorUI.transform.Find("DragBar").gameObject;
             inspectorDragBar.AddComponent<DraggableUI>().target = inspectorUI.transform;
            
             GameObject waterDragBar = waterUI.transform.Find("DragBar").gameObject;
             waterDragBar.AddComponent<DraggableUI>().target = waterUI.transform;
+
+            GameObject pistonDragBar = pistonUI.transform.Find("DragBar").gameObject;
+            pistonDragBar.AddComponent<DraggableUI>().target = pistonUI.transform;
 
             GameObject railDragBar = railUI.transform.Find("DragBar").gameObject;
             railDragBar.AddComponent<DraggableUI>().target = railUI.transform;
@@ -166,6 +174,7 @@ namespace SBM_CustomLevels
 
             Button inspectorMinimizeButton = inspectorDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
             Button waterMinimizeButton = waterDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
+            Button pistonMinimizeButton = pistonDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
             Button railMinimizeButton = railDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
             Button objSettingsMinimizeButton = objSettingsDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
             
@@ -178,6 +187,12 @@ namespace SBM_CustomLevels
             waterMinimizeButton.onClick.AddListener(delegate
             {
                 GameObject background = waterDragBar.transform.parent.Find("Background").gameObject;
+                background.SetActive(!background.activeSelf);
+            });
+
+            pistonMinimizeButton.onClick.AddListener(delegate
+            {
+                GameObject background = pistonDragBar.transform.parent.Find("Background").gameObject;
                 background.SetActive(!background.activeSelf);
             });
 
@@ -199,9 +214,11 @@ namespace SBM_CustomLevels
             Button deleteButton = GameObject.Find("DeleteButton").GetComponent<Button>();
             Button undoButton = GameObject.Find("UndoButton").GetComponent<Button>();
             Button redoButton = GameObject.Find("RedoButton").GetComponent<Button>();
-            Button addKeyframeButton = GameObject.Find("AddKeyframeButton").GetComponent<Button>();
+            Button addWaterKeyframeButton = GameObject.Find("AddWaterKeyframeButton").GetComponent<Button>();
+            Button addPistonKeyframeButton = GameObject.Find("AddPistonKeyframeButton").GetComponent<Button>();
             Button addRailNodeButton = GameObject.Find("AddRailButton").GetComponent<Button>();
-            Button removeKeyframeButton = GameObject.Find("RemoveKeyframeButton").GetComponent<Button>();
+            Button removeWaterKeyframeButton = GameObject.Find("RemoveWaterKeyframeButton").GetComponent<Button>();
+            Button removePistonKeyframeButton = GameObject.Find("RemovePistonKeyframeButton").GetComponent<Button>();
             Button removeRailNodeButton = GameObject.Find("RemoveRailButton").GetComponent<Button>();
 
             // movebutton functionality
@@ -221,6 +238,20 @@ namespace SBM_CustomLevels
                 }
 
                 List<EditorSelectable> deletedObjects = new List<EditorSelectable>();
+
+                if (EditorManager.instance.ghostItem)
+                {
+                    if (EditorManager.instance.ghostItem.isActiveAndEnabled)
+                    {
+
+                        EditorManager.instance.ghostItem.Selected = false;
+                        EditorManager.instance.curSelected.Remove(EditorManager.instance.ghostItem);
+                        EditorManager.instance.selectableObjects.Remove(EditorManager.instance.ghostItem);
+                        Destroy(EditorManager.instance.ghostItem.gameObject);
+
+                        EditorManager.instance.ghostItem = null;
+                    }
+                }
 
                 foreach (EditorSelectable editorSelectable in EditorManager.instance.curSelected)
                 {
@@ -250,27 +281,51 @@ namespace SBM_CustomLevels
                 UndoManager.Redo();
             });
 
-            addKeyframeButton.onClick.AddListener(delegate
+            addWaterKeyframeButton.onClick.AddListener(delegate
             {
                 if (curWater == null)
                 {
                     return;
                 }
 
-                for (int i = 0; i < keyframeContainer.childCount; i++)
+                for (int i = 0; i < waterKeyframeContainer.childCount; i++)
                 {
-                    if (!keyframeContainer.GetChild(i).gameObject.activeSelf)
+                    if (!waterKeyframeContainer.GetChild(i).gameObject.activeSelf)
                     {
-                        keyframeContainer.GetChild(i).gameObject.SetActive(true);
+                        waterKeyframeContainer.GetChild(i).gameObject.SetActive(true);
                         curWater.keyframes.Add(new Keyframe(0, 0));
 
                         break;
                     }
                 }
 
-                if (curWater.keyframes.Count > 4 && keyframeContainer.sizeDelta.y != (42*maxWaterKeyframes))
+                if (curWater.keyframes.Count > 4 && waterKeyframeContainer.sizeDelta.y != (42*maxKeyframes))
                 {
-                    keyframeContainer.sizeDelta = new Vector2(keyframeContainer.sizeDelta.x, keyframeContainer.sizeDelta.y + 42);
+                    waterKeyframeContainer.sizeDelta = new Vector2(waterKeyframeContainer.sizeDelta.x, waterKeyframeContainer.sizeDelta.y + 42);
+                }
+            });
+
+            addPistonKeyframeButton.onClick.AddListener(delegate
+            {
+                if (curPiston == null)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < pistonKeyframeContainer.childCount; i++)
+                {
+                    if (!pistonKeyframeContainer.GetChild(i).gameObject.activeSelf)
+                    {
+                        pistonKeyframeContainer.GetChild(i).gameObject.SetActive(true);
+                        curPiston.keyframes.Add(new Keyframe(0, 0));
+
+                        break;
+                    }
+                }
+
+                if (curPiston.keyframes.Count > 4 && pistonKeyframeContainer.sizeDelta.y != (42 * maxKeyframes))
+                {
+                    pistonKeyframeContainer.sizeDelta = new Vector2(pistonKeyframeContainer.sizeDelta.x, pistonKeyframeContainer.sizeDelta.y + 42);
                 }
             });
 
@@ -285,12 +340,21 @@ namespace SBM_CustomLevels
                 }                
             });
 
-            removeKeyframeButton.onClick.AddListener(delegate
+            removeWaterKeyframeButton.onClick.AddListener(delegate
             {
                 if (curWater)
                 {
                     curWater.keyframes.RemoveAt(curWater.keyframes.Count - 1);
                     SetWaterKeyframes();
+                }
+            });
+
+            removePistonKeyframeButton.onClick.AddListener(delegate
+            {
+                if (curPiston)
+                {
+                    curPiston.keyframes.RemoveAt(curPiston.keyframes.Count - 1);
+                    SetPistonKeyframes();
                 }
             });
 
@@ -430,9 +494,9 @@ namespace SBM_CustomLevels
             });
 
             // instantiate all water keyframes
-            for (int i = 0; i < maxWaterKeyframes; i++)
+            for (int i = 0; i < maxKeyframes; i++)
             {
-                GameObject newKeyframe = Instantiate(keyframeUI, keyframeContainer);
+                GameObject newKeyframe = Instantiate(keyframeUI, waterKeyframeContainer);
                 newKeyframe.name = i.ToString();
 
                 // [0] = time
@@ -487,11 +551,69 @@ namespace SBM_CustomLevels
                 newKeyframe.SetActive(false);
             }
 
+            // instantiate all piston keyframes
+            for (int i = 0; i < maxKeyframes; i++)
+            {
+                GameObject newKeyframe = Instantiate(keyframeUI, pistonKeyframeContainer);
+                newKeyframe.name = i.ToString();
+
+                // [0] = time
+                // [1] = value
+                InputField[] inputFields = newKeyframe.GetComponentsInChildren<InputField>();
+                inputFields[0].onValueChanged.AddListener(delegate (string value)
+                {
+                    if (!inputFields[0].isFocused)
+                    {
+                        return;
+                    }
+
+                    if (EditorManager.instance.curSelected.Count == 0)
+                    {
+                        return;
+                    }
+
+                    if (curPiston)
+                    {
+                        if (float.TryParse(value, out float result))
+                        {
+                            int index = int.Parse(inputFields[0].transform.parent.parent.name);
+
+                            curPiston.keyframes[index] = new Keyframe(result, curPiston.keyframes[index].value);
+                        }
+                    }
+                });
+
+                inputFields[1].onValueChanged.AddListener(delegate (string value)
+                {
+                    if (!inputFields[1].isFocused)
+                    {
+                        return;
+                    }
+
+                    if (EditorManager.instance.curSelected.Count == 0)
+                    {
+                        return;
+                    }
+
+                    if (curPiston)
+                    {
+                        if (float.TryParse(value, out float result))
+                        {
+                            int index = int.Parse(inputFields[1].transform.parent.parent.name);
+
+                            curPiston.keyframes[index] = new Keyframe(curPiston.keyframes[index].time, result);
+                        }
+                    }
+                });
+
+                newKeyframe.SetActive(false);
+            }
+
             // flip block object UI
-            flipBlockSpikes = flipBlockContainer.transform.Find("Spikes").GetComponentInChildren<Toggle>();
-            flipBlockDegrees = flipBlockContainer.transform.Find("FlipDegrees").GetComponentInChildren<InputField>();
-            flipBlockTime = flipBlockContainer.transform.Find("Flip Time").GetComponentInChildren<InputField>();
-            flipBlockDirection = flipBlockContainer.transform.Find("Direction").GetComponentsInChildren<Button>();
+            flipBlockSpikes = flipBlockSettingsContainer.transform.Find("Spikes").GetComponentInChildren<Toggle>();
+            flipBlockDegrees = flipBlockSettingsContainer.transform.Find("FlipDegrees").GetComponentInChildren<InputField>();
+            flipBlockTime = flipBlockSettingsContainer.transform.Find("Flip Time").GetComponentInChildren<InputField>();
+            flipBlockDirection = flipBlockSettingsContainer.transform.Find("Direction").GetComponentsInChildren<Button>();
             flipBlockCheckmarks[0] = flipBlockDirection[0].transform.Find("Left Checkmark").gameObject;
             flipBlockCheckmarks[1] = flipBlockDirection[1].transform.Find("Right Checkmark").gameObject;
 
@@ -579,7 +701,7 @@ namespace SBM_CustomLevels
                 }
             });
 
-            flipBlockContainer.SetActive(false);
+            flipBlockSettingsContainer.SetActive(false);
 
             sizeField[0].onValueChanged.AddListener(delegate (string value)
             {
@@ -693,8 +815,8 @@ namespace SBM_CustomLevels
             });
 
             // piston platform object UI
-            pistonMaxTravel = pistonPlatformContainer.transform.Find("MaxTravel").GetComponentInChildren<InputField>();
-            pistonShaftLength = pistonPlatformContainer.transform.Find("ShaftLength").GetComponentInChildren<InputField>();
+            pistonMaxTravel = pistonSettingsContainer.transform.Find("MaxTravel").GetComponentInChildren<InputField>();
+            pistonShaftLength = pistonSettingsContainer.transform.Find("ShaftLength").GetComponentInChildren<InputField>();
 
             pistonMaxTravel.onValueChanged.AddListener(delegate (string value)
             {
@@ -886,12 +1008,12 @@ namespace SBM_CustomLevels
                     {
                         spawnedObject = Instantiate(EditorManager.fakeWater);
 
-                        FakeWater fakeWater = spawnedObject.GetComponent<FakeWater>();
+                        WaterDataContainer fakeWater = spawnedObject.GetComponent<WaterDataContainer>();
                         fakeWater.width = 3;
                         fakeWater.height = 2;
                         curWater = fakeWater;
                         ClearWaterKeyframes();
-                        EnableWaterUI(true);
+                        DisableOtherUIs("water");
                     }
                     else if (button.gameObject.name == "FlipBlock" || button.gameObject.name == "SeeSaw" || button.gameObject.name == "StiffRod" || button.gameObject.name == "PistonPlatform" || button.gameObject.name == "WaterTank")
                     {
@@ -901,7 +1023,16 @@ namespace SBM_CustomLevels
 
                         if (button.gameObject.name != "WaterTank")
                         {
-                            EnableObjSettingsUI(true);
+                            DisableOtherUIs("mesh");
+
+                            if (button.gameObject.name == "PistonPlatform")
+                            {
+                                PistonDataContainer pistonData = spawnedObject.AddComponent<PistonDataContainer>();
+                                curPiston = pistonData;
+                                ClearPistonKeyframes();
+
+                                DisableOtherUIs("piston");
+                            }
 
                             SetObjSettingsInformation(spawnedObject);
                         }
@@ -917,13 +1048,13 @@ namespace SBM_CustomLevels
 
                             Destroy(spawnedObject.transform.Find("Water_W5").gameObject);
 
-                            FakeWater fakeWater = spawnedObject.AddComponent<FakeWater>();
+                            WaterDataContainer fakeWater = spawnedObject.AddComponent<WaterDataContainer>();
                             fakeWater.width = 1;
                             fakeWater.height = 1;
                             fakeWater.w5 = true;
                             curWater = fakeWater;
                             ClearWaterKeyframes();
-                            EnableWaterUI(true);
+                            DisableOtherUIs("water");
                         }
 
                         // ALSO: add ui for modifying size, replace water ui with general purpose ui
@@ -934,6 +1065,8 @@ namespace SBM_CustomLevels
                     }
                     else if (button.gameObject.name == "Wormhole")
                     {
+                        DisableOtherUIs("inspector");
+
                         if (EditorManager.instance.wormhole)
                         {
                             EditorManager.instance.wormhole.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
@@ -947,6 +1080,8 @@ namespace SBM_CustomLevels
                     }
                     else if (button.gameObject.name == "Carrot")
                     {
+                        DisableOtherUIs("inspector");
+
                         if (EditorManager.instance.carrot)
                         {
                             EditorManager.instance.carrot.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
@@ -960,14 +1095,16 @@ namespace SBM_CustomLevels
                     }
                     else if (button.gameObject.name == "MinecartRail")
                     {
-                        Vector3 pos = new Vector3(centerPos.x, centerPos.y, 0);
+                        DisableOtherUIs("rail");
 
+                        Vector3 pos = new Vector3(centerPos.x, centerPos.y, 0);
                         spawnedObject = MinecartRailHelper.SpawnNewRail(pos);
                     }
                     else if (button.gameObject.name == "FloppyRod")
                     {
+                        DisableOtherUIs("inspector");
                         //objSettingsUI.SetActive(true);
-                        flipBlockContainer.SetActive(false);
+                        flipBlockSettingsContainer.SetActive(false);
                         //floppyRodContainer.SetActive(true);
 
                         spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
@@ -981,6 +1118,8 @@ namespace SBM_CustomLevels
                     }*/
                     else if (button.gameObject.name == "PlayerSpawn")
                     {
+                        DisableOtherUIs("inspector");
+
                         if (!EditorManager.instance.spawn1.activeSelf)
                         {
                             EditorManager.instance.spawn1.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
@@ -1000,11 +1139,15 @@ namespace SBM_CustomLevels
                     }
                     else if (button.gameObject.name == "MinecartRail_Sleeper")
                     {
+                        DisableOtherUIs("inspector");
+
                         spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                         spawnedObject.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
                     }
                     else if (button.gameObject.name == "KillBounds")
                     {
+                        DisableOtherUIs("inspector");
+
                         spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
 
                         Material mat = new Material(Shader.Find("Standard"));
@@ -1013,6 +1156,8 @@ namespace SBM_CustomLevels
                     }
                     else if (button.gameObject.name == "BoulderDestroyer")
                     {
+                        DisableOtherUIs("inspector");
+
                         spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
 
                         Material mat = new Material(Shader.Find("Standard"));
@@ -1021,6 +1166,8 @@ namespace SBM_CustomLevels
                     }
                     else
                     {
+                        DisableOtherUIs("inspector");
+
                         spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                     }
 
@@ -1101,10 +1248,12 @@ namespace SBM_CustomLevels
                         
                         EditorManager.instance.ghostItem = selectable;
                     }
+                    else
+                    {
+                        UndoManager.AddUndo(UndoManager.UndoType.Place, new List<EditorSelectable> { selectable });
+                    }
 
                     EditorUI.instance.EnableInspector(true);
-
-                    UndoManager.AddUndo(UndoManager.UndoType.Place, new List<EditorSelectable> { selectable });
                 });
             }
 
@@ -1121,6 +1270,7 @@ namespace SBM_CustomLevels
 
             inspectorUI.SetActive(false);
             waterUI.SetActive(false);
+            pistonUI.SetActive(false);
             railUI.SetActive(false);
             objSettingsUI.SetActive(false);
             uiBarBottom.SetActive(false);
@@ -1255,6 +1405,11 @@ namespace SBM_CustomLevels
             waterUI.SetActive(enable);
         }
 
+        public void EnablePistonUI(bool enable)
+        {
+            pistonUI.SetActive(enable);
+        }
+
         public void EnableRailUI(bool enable)
         {
             railUI.SetActive(enable);
@@ -1265,9 +1420,58 @@ namespace SBM_CustomLevels
             objSettingsUI.SetActive(enable);
         }
 
+        public void DisableOtherUIs(string toEnable)
+        {
+            switch (toEnable)
+            {
+                case "inspector":
+                    EnableInspector(true);
+                    EnableWaterUI(false);
+                    EnablePistonUI(false);
+                    EnableRailUI(false);
+                    EnableObjSettingsUI(false);
+                    break;
+                case "water":
+                    EnableInspector(true);
+                    EnableWaterUI(true);
+                    EnablePistonUI(false);
+                    EnableRailUI(false);
+                    EnableObjSettingsUI(false);
+                    break;
+                case "piston":
+                    EnableInspector(true);
+                    EnableWaterUI(false);
+                    EnablePistonUI(true);
+                    EnableRailUI(false);
+                    EnableObjSettingsUI(true);
+                    break;
+                case "rail":
+                    EnableInspector(true);
+                    EnableWaterUI(false);
+                    EnablePistonUI(false);
+                    EnableRailUI(true);
+                    EnableObjSettingsUI(false);
+                    break;
+                case "mesh":
+                    EnableInspector(true);
+                    EnableWaterUI(false);
+                    EnablePistonUI(false);
+                    EnableRailUI(false);
+                    EnableObjSettingsUI(true);
+                    break;
+                default:
+                    EnableInspector(false);
+                    EnableObjSettingsUI(false);
+                    EnableWaterUI(false);
+                    EnablePistonUI(false);
+                    EnableRailUI(false);
+                    break;
+            }
+        }
+
         public void SetWaterKeyframes()
         {
-            keyframeContainer.sizeDelta = defaultKeyframeContainerSize;
+            waterKeyframeContainer.sizeDelta = defaultKeyframeContainerSize;
 
             //disable existing keyframes ui
             ClearWaterKeyframes();
@@ -1281,12 +1485,12 @@ namespace SBM_CustomLevels
 
             for (int i = 0; i < curWater.keyframes.Count; i++)
             {
-                if (i > maxWaterKeyframes)
+                if (i > maxKeyframes)
                 {
                     return;
                 }
 
-                GameObject keyframe = keyframeContainer.GetChild(i).gameObject;
+                GameObject keyframe = waterKeyframeContainer.GetChild(i).gameObject;
 
                 InputField[] inputFields = keyframe.GetComponentsInChildren<InputField>();
                 inputFields[0].text = curWater.keyframes[i].time.ToString();
@@ -1301,14 +1505,14 @@ namespace SBM_CustomLevels
                 }
             }
 
-            keyframeContainer.sizeDelta = new Vector2(keyframeContainer.sizeDelta.x, keyframeContainer.sizeDelta.y + (42*(resizeCount+1)));
+            waterKeyframeContainer.sizeDelta = new Vector2(waterKeyframeContainer.sizeDelta.x, waterKeyframeContainer.sizeDelta.y + (42*(resizeCount+1)));
         }
 
         private void ClearWaterKeyframes()
         {
-            for (int i = 0; i < keyframeContainer.childCount; i++)
+            for (int i = 0; i < waterKeyframeContainer.childCount; i++)
             {
-                GameObject keyframe = keyframeContainer.GetChild(i).gameObject;
+                GameObject keyframe = waterKeyframeContainer.GetChild(i).gameObject;
 
                 InputField[] inputFields = keyframe.GetComponentsInChildren<InputField>();
                 inputFields[0].text = "";
@@ -1317,7 +1521,62 @@ namespace SBM_CustomLevels
                 keyframe.SetActive(false);
             }
 
-            keyframeContainer.sizeDelta = defaultKeyframeContainerSize;
+            waterKeyframeContainer.sizeDelta = defaultKeyframeContainerSize;
+        }
+
+        public void SetPistonKeyframes()
+        {
+            pistonKeyframeContainer.sizeDelta = defaultKeyframeContainerSize;
+
+            //disable existing keyframes ui
+            ClearPistonKeyframes();
+
+            if (curPiston == null)
+            {
+                return;
+            }
+
+            int resizeCount = 0;
+
+            for (int i = 0; i < curPiston.keyframes.Count; i++)
+            {
+                if (i > maxKeyframes)
+                {
+                    return;
+                }
+
+                GameObject keyframe = pistonKeyframeContainer.GetChild(i).gameObject;
+
+                InputField[] inputFields = keyframe.GetComponentsInChildren<InputField>();
+                inputFields[0].text = curPiston.keyframes[i].time.ToString();
+                inputFields[1].text = curPiston.keyframes[i].value.ToString();
+
+                keyframe.SetActive(true);
+
+                //resize container for scrollrect to properly scroll
+                if (i > 4)
+                {
+                    resizeCount++;
+                }
+            }
+
+            pistonKeyframeContainer.sizeDelta = new Vector2(pistonKeyframeContainer.sizeDelta.x, pistonKeyframeContainer.sizeDelta.y + (42 * (resizeCount + 1)));
+        }
+
+        private void ClearPistonKeyframes()
+        {
+            for (int i = 0; i < pistonKeyframeContainer.childCount; i++)
+            {
+                GameObject keyframe = pistonKeyframeContainer.GetChild(i).gameObject;
+
+                InputField[] inputFields = keyframe.GetComponentsInChildren<InputField>();
+                inputFields[0].text = "";
+                inputFields[1].text = "";
+
+                keyframe.SetActive(false);
+            }
+
+            pistonKeyframeContainer.sizeDelta = defaultKeyframeContainerSize;
         }
 
         public void SetRailInformation()
@@ -1366,21 +1625,21 @@ namespace SBM_CustomLevels
                     flipBlockCheckmarks[1].SetActive(true);
                 }
 
-                flipBlockContainer.SetActive(true);
-                pistonPlatformContainer.SetActive(false);
+                flipBlockSettingsContainer.SetActive(true);
+                pistonSettingsContainer.SetActive(false);
             }
             else if (gameObject.TryGetComponent(out SBM.Objects.World5.PistonPlatform pistonPlatform))
             {
                 pistonMaxTravel.text = pistonPlatform.pistonMaxTravel.ToString();
                 pistonShaftLength.text = pistonPlatform.extraShaftLength.ToString();
 
-                pistonPlatformContainer.SetActive(true);
-                flipBlockContainer.SetActive(false);
+                pistonSettingsContainer.SetActive(true);
+                flipBlockSettingsContainer.SetActive(false);
             }
             else
             {
-                pistonPlatformContainer.SetActive(false);
-                flipBlockContainer.SetActive(false);
+                pistonSettingsContainer.SetActive(false);
+                flipBlockSettingsContainer.SetActive(false);
             }
         }
 
@@ -1480,7 +1739,7 @@ namespace SBM_CustomLevels
                     {
                         scale[coordinate] = result;
 
-                        FakeWater fakeWater = selectable.gameObject.GetComponent<FakeWater>();
+                        WaterDataContainer fakeWater = selectable.gameObject.GetComponent<WaterDataContainer>();
 
                         if (fakeWater)
                         {

@@ -656,11 +656,11 @@ namespace SBM_CustomLevels
                     {
                         // send world identifier to all other players when in network. levelID.levelNumber - 1, since levelID.levelNumber starts at 1 rather than 0.
                         MultiplayerManager.SendCustomLevelData(levelID.world.WorldHash, levelID.levelNumber - 1);
-                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber);
+                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber, levelID.world);
                     }
                     else
                     {
-                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber);
+                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber, levelID.world);
                     }
 
                     return false;

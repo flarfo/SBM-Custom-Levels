@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using System.Collections;
+using System.Linq;
 using System.Reflection.Emit;
 using UnityEngine.UI;
 using SceneSystem = SBM.Shared.SceneSystem;
@@ -408,6 +409,7 @@ namespace SBM_CustomLevels
 			return true;
         }
 
+		// load into next customlevel after completing level
         [HarmonyPatch(typeof(SBM.UI.Game.StoryMode.UIStoryNextLevelQuery), "GoToNextLevel")]
         [HarmonyPrefix]
 		static bool GoToNextCustomLevel(SBM.UI.Game.StoryMode.UIStoryNextLevelQuery __instance)
@@ -423,6 +425,18 @@ namespace SBM_CustomLevels
 					try
 					{
 						LevelManager.instance.BeginLoadLevel(false, false, nextLevel, -1);
+
+						int levelNumber = ushort.MaxValue;
+
+                        for (int i = 0; i < LevelManager.instance.currentWorld.levels.Count; i++)
+                        {
+							if (LevelManager.instance.currentWorld.levels[i] == nextLevel)
+                            {
+								levelNumber = i;
+                            }
+                        }
+
+						MultiplayerManager.SendCustomLevelData(LevelManager.instance.currentWorld.WorldHash, levelNumber);
 					}
                     catch
                     {
@@ -432,7 +446,8 @@ namespace SBM_CustomLevels
                 else // if no next level, return to menu
                 {
 					SceneSystem.LoadScene("Menu");
-                }
+					MultiplayerManager.SendCustomLevelData(LevelManager.instance.currentWorld.WorldHash, ushort.MaxValue);
+				}
 				
 				return false;
             }
