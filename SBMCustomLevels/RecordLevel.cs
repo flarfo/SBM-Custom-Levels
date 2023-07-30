@@ -53,6 +53,8 @@ namespace SBM_CustomLevels
         "Signpost_W5_Death", "SlipNSlide", "CrossPipe", "ScaffoldForwardPipeRemover", "Scaffolding", "ScaffoldPanel", "ScaffoldPanel_RB", "ScaffoldPanelDestroyer",
         "ScaffoldPanelSpline", "ScaffoldPipeExtra", "ScaffoldPipeExtraDouble", "ScaffoldPipeSpline", "SparkShower", "Spotlight", "Spotlight_SurfaceMount", "SteamMachine", "StiffRod", "SupportPole", 
         "TrackingSpotlight", "WaterTank", "World5_BG" }; //may not work with scaffolding, objects are inside another folder ("scaffolding")
+
+        static List<string> customContents = new List<string> { "SplineObject", "ScaffoldingBlock", "ScaffoldingCorner", "ScaffoldPanelBlack", "ScaffoldPanelBrown" };
         #endregion
 
         public static void RecordJSONLevel()
@@ -74,6 +76,7 @@ namespace SBM_CustomLevels
             List<FlipBlockObject> flipBlockObjects = new List<FlipBlockObject>();
             List<PistonObject> pistonObjects = new List<PistonObject>();
             List<RailObject> railObjects = new List<RailObject>();
+            List<SplineObject> splineObjects = new List<SplineObject>();
 
             string worldStyle = EditorManager.instance.worldStyle.ToString();
             Debug.Log("World Style: " + worldStyle);
@@ -97,6 +100,10 @@ namespace SBM_CustomLevels
                 {
                     railObjects.Add(new RailObject(objects[i].gameObject));
                 }
+                else if (objectName.Contains("SplineObject"))
+                {
+                    splineObjects.Add(new SplineObject(objects[i].gameObject));
+                }
                 else if (objectName.Contains("SeeSaw") || objectName.Contains("StiffRod"))
                 {
                     meshSliceObjects.Add(new MeshSliceObject(objects[i].gameObject));
@@ -109,7 +116,7 @@ namespace SBM_CustomLevels
                 {
                     pistonObjects.Add(new PistonObject(objects[i].gameObject));
                 }
-                else if (objectName != string.Empty && objectName != "Node")
+                else if (objectName != string.Empty && !objectName.Contains("Node"))
                 {
                     defaultObjects.Add(new DefaultObject(objects[i].gameObject));
                 }
@@ -117,7 +124,8 @@ namespace SBM_CustomLevels
 
             string filePath = Path.Combine(LevelLoader_Mod.levelsPath, EditorManager.instance.selectedLevel);
 
-            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, defaultObjects, waterObjects, meshSliceObjects, flipBlockObjects, pistonObjects, railObjects), Formatting.Indented) });
+            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, defaultObjects, waterObjects, 
+                meshSliceObjects, flipBlockObjects, pistonObjects, railObjects, splineObjects), Formatting.Indented) });
         }
 
         public static string NameToPath(string goName)
@@ -165,6 +173,10 @@ namespace SBM_CustomLevels
                     path = Path.Combine(baseResourcesPath, "world5");
                 }
 
+            }
+            else if (customContents.Contains(goName))
+            {
+                return goName;
             }
             else return "";
 

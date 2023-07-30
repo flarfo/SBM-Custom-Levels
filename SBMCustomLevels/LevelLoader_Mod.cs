@@ -68,6 +68,10 @@ namespace SBM_CustomLevels
 
             EditorManager.iceSledSpikesGuide = sbmBundle.LoadAsset<GameObject>("IceSledSpikesGuide");
             EditorManager.playerSpawn = sbmBundle.LoadAsset<GameObject>("PlayerSpawn");
+            EditorManager.scaffoldingBlock = sbmBundle.LoadAsset<GameObject>("ScaffoldingBlock");
+            EditorManager.scaffoldingCorner = sbmBundle.LoadAsset<GameObject>("ScaffoldingCorner");
+            EditorManager.scaffoldPanelBlack = sbmBundle.LoadAsset<GameObject>("ScaffoldPanelBlack");
+            EditorManager.scaffoldPanelBrown = sbmBundle.LoadAsset<GameObject>("ScaffoldPanelBrown");
 
             EditorManager.outlineMask = sbmBundle.LoadAsset<Material>("OutlineMask");
             EditorManager.outlineFill = sbmBundle.LoadAsset<Material>("OutlineFill");
@@ -75,6 +79,9 @@ namespace SBM_CustomLevels
             MinecartRailHelper.railSplineTile = sbmBundle.LoadAsset<Mesh>("RailSplineTile");
             MinecartRailHelper.railMaterial = sbmBundle.LoadAsset<Material>("MinecartRail");
             MinecartRailHelper.railNodeHandle = sbmBundle.LoadAsset<GameObject>("RailNode");
+
+            SplineMakerHelper.splineNodeHandle = sbmBundle.LoadAsset<GameObject>("RailNode");
+            SplineMakerHelper.splineMaterial = sbmBundle.LoadAsset<Material>("ScaffoldPlatform");
 
             sbmBundle.Unload(false);
         }
@@ -177,7 +184,10 @@ namespace SBM_CustomLevels
 
         public void UpdateLevels()
         {
-            levels = Directory.GetFiles(worldPath, "*.sbm").ToList();
+            if (Directory.Exists(worldPath))
+            {
+                levels = Directory.GetFiles(worldPath, "*.sbm").ToList();
+            }
         }
 
         private ulong GetHashFromName()
@@ -215,7 +225,7 @@ namespace SBM_CustomLevels
                 {
                     value = 0;
                 }
-                else if (char.IsSymbol(c))
+                else if (char.IsSymbol(c) || char.IsPunctuation(c))
                 {
                     // INVALID: <>:"/\|?*
                     // use most common symbols for unique number identities
@@ -257,25 +267,26 @@ namespace SBM_CustomLevels
                 }
                 else
                 {
+                    hash += "9";
                     continue;
                 }
                 hash += value;
             }
-
+            
             // add 'salt' to ensure numerically equivalent names don't produce the same hash. 
             ulong total = 0;
             for (int i = 0; i < hash.Length; i++)
             {
                 total += (ulong)char.GetNumericValue(hash[i]);
             }
-
+            
             ulong final = ulong.Parse(hash) + total;
-
+            
             if (final > ulong.MaxValue)
             {
                 final = ulong.MaxValue - total;
             }
-
+            
             return final;
         }
     }

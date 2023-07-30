@@ -16,6 +16,7 @@ namespace SBM_CustomLevels
         public List<FlipBlockObject> flipBlockObjects;
         public List<PistonObject> pistonObjects;
         public List<RailObject> railObjects;
+        public List<SplineObject> splineObjects;
 
         [JsonConstructor]
         public ObjectContainer()
@@ -24,7 +25,8 @@ namespace SBM_CustomLevels
         }
 
         public ObjectContainer(FloatObject pos1, FloatObject pos2, List<DefaultObject> _defaultObjects, List<WaterObject> _waterObjects, 
-            List<MeshSliceObject> _meshSliceObjects, List<FlipBlockObject> _flipBlockObjects, List<PistonObject> _pistonObjects, List<RailObject> _railObjects)
+            List<MeshSliceObject> _meshSliceObjects, List<FlipBlockObject> _flipBlockObjects, List<PistonObject> _pistonObjects, 
+            List<RailObject> _railObjects, List<SplineObject> _splineObjects)
         {
             spawnPosition1 = pos1;
             spawnPosition2 = pos2;
@@ -34,6 +36,7 @@ namespace SBM_CustomLevels
             flipBlockObjects = _flipBlockObjects;
             pistonObjects = _pistonObjects;
             railObjects = _railObjects;
+            splineObjects = _splineObjects;
         }
     }
 }

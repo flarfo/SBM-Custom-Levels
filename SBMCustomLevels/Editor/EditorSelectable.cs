@@ -14,9 +14,16 @@ namespace SBM_CustomLevels
             set
             {
                 selected = value;
-                outline.enabled = value;
 
-                SetInspectorInfo();
+                if (outline)
+                {
+                    outline.enabled = value;
+                }
+                
+                if (value)
+                {
+                    SetInspectorInfo();
+                }
 
                 // carrots are weird, outlines dont reset when deselected. fixes outline staying baked permanently
                 if (!value && (gameObject.name.Contains("Carrot") || gameObject.name.Contains("HotdogKart")))
@@ -25,6 +32,7 @@ namespace SBM_CustomLevels
                 }
             }
         }
+
         public Outline outline;
 
         Vector3 mouseOffset;
@@ -43,7 +51,10 @@ namespace SBM_CustomLevels
             outline.OutlineWidth = 2f;
 
             outline.enabled = false;
+        }
 
+        void OnEnable()
+        {
             EditorManager.instance.selectableObjects.Add(this);
         }
 
@@ -60,6 +71,7 @@ namespace SBM_CustomLevels
         private void OnDisable()
         {
             Selected = false;
+            EditorManager.instance.selectableObjects.Remove(this);
         }
 
         public void MoveObject(Vector2 snapVector)

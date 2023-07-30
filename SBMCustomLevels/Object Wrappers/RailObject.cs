@@ -10,7 +10,7 @@ namespace SBM_CustomLevels
     [Serializable]
     public class RailObject : DefaultObject
     {
-        public List<SplineNodeObject> nodes;
+        public List<RailSplineNodeObject> nodes;
 
         [JsonConstructor]
         public RailObject()
@@ -21,31 +21,31 @@ namespace SBM_CustomLevels
         public RailObject(GameObject gameObject) : base(gameObject)
         {
             // preserve node order
-            List<SplineNode> splineNodes = gameObject.GetComponentsInChildren<SplineNodeData>().Select(x => x.node).OrderBy(x => x.Position.x).ToList();
+            List<SplineNode> splineNodes = gameObject.GetComponentsInChildren<SplineMeshNodeData>().OrderBy(x => x.nodeID).Select(x => x.node).ToList();
 
-            nodes = new List<SplineNodeObject>();
+            nodes = new List<RailSplineNodeObject>();
 
             foreach (SplineNode node in splineNodes)
             {
-                nodes.Add(new SplineNodeObject(node));
+                nodes.Add(new RailSplineNodeObject(node));
             }
         }
     }
 
     [Serializable]
-    public class SplineNodeObject
+    public class RailSplineNodeObject
     {
         public float[] position = new float[3];
         public float[] direction = new float[3];
         public float[] up = new float[3];
 
         [JsonConstructor]
-        public SplineNodeObject()
+        public RailSplineNodeObject()
         {
 
         }
 
-        public SplineNodeObject(SplineNode node)
+        public RailSplineNodeObject(SplineNode node)
         {
             position[0] = node.Position.x;
             position[1] = node.Position.y;

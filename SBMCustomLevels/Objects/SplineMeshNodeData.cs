@@ -4,10 +4,13 @@ using SplineMesh;
 
 namespace SBM_CustomLevels
 {
-    public class SplineNodeData : MonoBehaviour
+    // creates a "node" handle along the SplineMesh spline to allow user to click and edit the spline in the SBM editor
+    // specifically for working with the <<SplineMesh>> package ----> SplineSmoother ----> MinecartRailHelper 
+    public class SplineMeshNodeData : MonoBehaviour
     {
         public SplineNode node;
         public Spline spline;
+        public int nodeID;
 
         public bool doSmoothing = false;
 
@@ -25,8 +28,11 @@ namespace SBM_CustomLevels
 
             lastPosition = transform.localPosition;
 
+            
+            nodeID = spline.nodes.IndexOf(node);
+
             // rail breaks when start node is updated first, likely because direction vector of 2nd node is not set yet
-            if (spline.nodes.IndexOf(node) != 0)
+            if (nodeID != 0)
             {
                 UpdateNode();
             }
@@ -47,7 +53,7 @@ namespace SBM_CustomLevels
 
         public void UpdateNode()
         {
-            int nodeID = spline.nodes.IndexOf(node);
+            nodeID = spline.nodes.IndexOf(node);
 
             node.Position = transform.localPosition;
 
@@ -76,6 +82,29 @@ namespace SBM_CustomLevels
                     splineSmoother.SmoothNode(spline.nodes[nodeID + 1]);
                 }
             }
+        }
+
+        public SplineMeshNodeData AddNodeAfter()
+        {
+            SplineNode newNode = new SplineNode(node.Direction, node.Direction + node.Direction - node.Position);
+            newNode.Up = node.Up;
+
+            //var index = spline.nodes.IndexOf(node);
+
+            if (nodeID == spline.nodes.Count - 1)
+            {
+                spline.AddNode(newNode);
+            }
+            else
+            {
+                spline.InsertNode(nodeID + 1, newNode);
+            }
+
+            SplineMeshNodeData nodeHandle = MinecartRailHelper.CreateNodeHandle(spline.transform, newNode);
+            nodeHandle.doSmoothing = true;
+            nodeHandle.transform.localPosition = node.Direction;
+
+            return nodeHandle;
         }
     }
 }

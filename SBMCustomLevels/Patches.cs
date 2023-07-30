@@ -71,6 +71,19 @@ namespace SBM_CustomLevels
 			return true;
         }
 
+		// bug in editor with copy instantiating and disabling objects, breaks selection for NObjects (which don't matter in editor when network is not in session)
+        [HarmonyPatch(typeof(Catobyte.Networking.Physics.Objects.NObject), "OnDisable")]
+        [HarmonyPrefix]
+		static bool StopNullReference()
+        {
+			if (EditorManager.inEditor)
+            {
+				return false;
+            }
+
+			return true;
+        }
+
 		[HarmonyPatch(typeof(SceneSystem), "SetActiveScene")]
         [HarmonyPrefix]
         static void ExitEditor(string name)

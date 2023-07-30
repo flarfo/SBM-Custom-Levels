@@ -271,12 +271,59 @@ namespace SBM_CustomLevels
 
             try
             {
+                bool carrotLoaded = false;
+                bool wormholeLoaded = false;
+
                 foreach (DefaultObject defaultObject in json.defaultObjects) //itearate through default objects, instantiate based on name
                 {
                     GameObject loadedObject;
 
-                    loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    if (defaultObject.objectName == "ScaffoldingBlock")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldingBlock, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
+                    else if (defaultObject.objectName == "ScaffoldingCorner")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldingCorner, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
+                    else if (defaultObject.objectName == "ScaffoldPanelBlack")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldPanelBlack, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
+                    else if (defaultObject.objectName == "ScaffoldPanelBrown")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldPanelBrown, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
+                    else
+                    {
+                        loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
+                    
                     loadedObject.transform.localScale = defaultObject.GetScale();
+
+                    if (loadedObject.name.Contains("Carrot"))
+                    {
+                        carrotLoaded = true;
+                    }
+
+                    if (loadedObject.name.Contains("Wormhole"))
+                    {
+                        wormholeLoaded = true;
+                    }
+                }
+
+                if (!wormholeLoaded)
+                {
+                    Debug.LogError("Missing wormhole in json! Instantiating default wormhole!");
+
+                    GameObject wormhole = Instantiate(Resources.Load(RecordLevel.NameToPath("Wormhole"))) as GameObject;
+                    wormhole.transform.position = new Vector3(5, 0, 0);
+                }
+
+                if (!carrotLoaded)
+                {
+                    Debug.LogError("Missing carrot in json! Instantiating default carrot!");
+                    Instantiate(Resources.Load(RecordLevel.NameToPath("Carrot")));
                 }
             }
             catch
@@ -368,7 +415,18 @@ namespace SBM_CustomLevels
 
                     for (int i = 0; i < flipBlock.spikesEnabled.Length; i++)
                     {
+                        flipBlock.spikesEnabled = flipBlockObject.spikesEnabled;
                         flipBlock.spikes[i].SetActive(flipBlock.spikesEnabled[i]);
+                    }
+
+                    for (int i = 0; i < flipBlock.spikes.Length; i++)
+                    {
+                        // oscillate between 0, 1, 0, -1 using Sin to determine the x position of the current spike, where 1 = right, -1 = left
+                        int xDir = (int)Math.Sin((Math.PI * i) / 2); // 0 1 0 -1
+                        int yDir = (int)Math.Cos((Math.PI * i) / 2); // 1 0 -1 0
+
+                        GameObject curSpike = flipBlock.spikes[i];
+                        curSpike.transform.localPosition = new Vector3((xDir * flipBlockObject.meshWidth) / 2, (yDir * flipBlockObject.meshHeight) / 2, curSpike.transform.localPosition.z);
                     }
 
                     flipBlock.timeBetweenFlips = flipBlockObject.flipTime;
@@ -438,7 +496,19 @@ namespace SBM_CustomLevels
             {
                 Debug.LogError("Missing railObjects in json!");
             }
-            
+
+            try
+            {
+                foreach (SplineObject splineObject in json.splineObjects)
+                {
+                    GameObject loadedObject = SplineMakerHelper.CreateSplineFromObject(splineObject, false);
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing splineObjects in json!");
+            }
+
             GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_1.transform.position = spawnPos_1;
 

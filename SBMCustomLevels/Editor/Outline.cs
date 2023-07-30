@@ -132,10 +132,13 @@ namespace SBM_CustomLevels
         {
             foreach (var renderer in renderers)
             {
+                if (!renderer)
+                {
+                    continue;
+                }
 
                 // Append outline shaders
                 var materials = renderer.sharedMaterials.ToList();
-
                 materials.Add(outlineMaskMaterial);
                 materials.Add(outlineFillMaterial);
 
@@ -177,6 +180,10 @@ namespace SBM_CustomLevels
         {
             foreach (var renderer in renderers)
             {
+                if (!renderer)
+                {
+                    continue;
+                }
 
                 // Remove outline shaders
                 var materials = renderer.sharedMaterials.ToList();
@@ -190,7 +197,6 @@ namespace SBM_CustomLevels
 
         void OnDestroy()
         {
-
             // Destroy material instances
             Destroy(outlineMaskMaterial);
             Destroy(outlineFillMaterial);

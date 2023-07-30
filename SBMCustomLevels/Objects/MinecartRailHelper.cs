@@ -37,11 +37,11 @@ namespace SBM_CustomLevels
             railSpline.end = endNode;
 
             // first rail handle
-            SplineNodeData point1 = CreateNodeHandle(rail.transform, startNode);
+            SplineMeshNodeData point1 = CreateNodeHandle(rail.transform, startNode);
             point1.transform.localPosition = startPos;
 
             // second rail handle
-            SplineNodeData point2 = CreateNodeHandle(rail.transform, endNode);
+            SplineMeshNodeData point2 = CreateNodeHandle(rail.transform, endNode);
             point2.transform.localPosition = endPos;
 
             return rail;
@@ -64,7 +64,7 @@ namespace SBM_CustomLevels
             rail.transform.rotation = Quaternion.Euler(railObject.GetRotation());
             rail.transform.localScale = railObject.GetScale();
 
-            foreach (SplineNodeObject nodeObject in railObject.nodes)
+            foreach (RailSplineNodeObject nodeObject in railObject.nodes)
             {
                 SplineNode node = nodeObject.GetAsSplineNode();
 
@@ -72,7 +72,7 @@ namespace SBM_CustomLevels
 
                 if (isEditor)
                 {
-                    SplineNodeData railNode = CreateNodeHandle(rail.transform, node);
+                    SplineMeshNodeData railNode = CreateNodeHandle(rail.transform, node);
                     railNode.transform.localPosition = node.Position;
                 }
             }
@@ -80,7 +80,7 @@ namespace SBM_CustomLevels
             return rail;
         }
 
-        private static SplineNodeData CreateNodeHandle(Transform parentRail, SplineNode node)
+        public static SplineMeshNodeData CreateNodeHandle(Transform parentRail, SplineNode node)
         {
             GameObject nodeHandle = GameObject.Instantiate(railNodeHandle);
             nodeHandle.name = "RailNode";
@@ -90,35 +90,12 @@ namespace SBM_CustomLevels
             nodeHandle.AddComponent<EditorSelectable>();
             nodeHandle.AddComponent<MeshCollider>();
 
-            SplineNodeData railNode = nodeHandle.AddComponent<SplineNodeData>();
+            SplineMeshNodeData railNode = nodeHandle.AddComponent<SplineMeshNodeData>();
             railNode.doSmoothing = true;
             railNode.spline = parentRail.GetComponent<Spline>();
             railNode.node = node;
             //make node a cube that renders on top
             return railNode;
-        }
-
-        public static SplineNodeData AddNodeAfterSelected(Spline spline, SplineNode selectedNode)
-        {
-            SplineNode newNode = new SplineNode(selectedNode.Direction, selectedNode.Direction + selectedNode.Direction - selectedNode.Position);
-            newNode.Up = selectedNode.Up;
-
-            var index = spline.nodes.IndexOf(selectedNode);
-
-            if (index == spline.nodes.Count - 1)
-            {
-                spline.AddNode(newNode);
-            }
-            else
-            {
-                spline.InsertNode(index + 1, newNode);
-            }
-
-            SplineNodeData node = CreateNodeHandle(spline.transform, newNode);
-            node.doSmoothing = true;
-            node.transform.localPosition = selectedNode.Direction;
-
-            return node;
         }
     }
 }

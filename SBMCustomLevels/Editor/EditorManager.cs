@@ -1,6 +1,7 @@
 ﻿using System;
+using System.Linq;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.Events;
 using SplineMesh;
 using System.IO;
 using System.Collections.Generic;
@@ -19,6 +20,10 @@ namespace SBM_CustomLevels
         public static GameObject fakeWater;
         public static GameObject iceSledSpikesGuide;
         public static GameObject playerSpawn;
+        public static GameObject scaffoldingBlock;
+        public static GameObject scaffoldingCorner;
+        public static GameObject scaffoldPanelBlack;
+        public static GameObject scaffoldPanelBrown;
 
         public List<EditorSelectable> selectableObjects = new List<EditorSelectable>();
 
@@ -120,12 +125,23 @@ namespace SBM_CustomLevels
 
                 foreach (EditorSelectable editorSelectable in curSelected)
                 {
-                    if (editorSelectable.gameObject.name.Contains("Wormhole") || editorSelectable.gameObject.name.Contains("Carrot"))
+                    if (editorSelectable.gameObject.name.Contains("Wormhole") || editorSelectable.gameObject.name.Contains("Carrot") || editorSelectable.gameObject.name.Contains("PlayerSpawn"))
                     {
-                        continue; // dont copy paste wormhole or carrot (should only be one of each)
+                        continue; // dont copy paste wormhole, carrot, or playerspawn (should only be one/two of each)
                     }
 
+                    // dont delete rail nodes, this should be managed by the minecart rail ui
+                    if (editorSelectable.gameObject.name.Contains("Node"))
+                    {
+                        continue; // dont copy paste rail node, these should be managed by railnode UI
+                    }
+
+                    editorSelectable.Selected = false;
+
                     EditorSelectable newObject = Instantiate(editorSelectable);
+
+                    editorSelectable.Selected = true;
+
                     copiedObjects.Add(newObject);
                     newObject.gameObject.SetActive(false);
                 }
@@ -172,10 +188,17 @@ namespace SBM_CustomLevels
 
                 foreach (EditorSelectable editorSelectable in curSelected)
                 {
+                    // dont delete rail nodes, this should be managed by the minecart rail ui
+                    if (editorSelectable.gameObject.name.Contains("Node") || editorSelectable.gameObject.name.Contains("Wormhole") || editorSelectable.gameObject.name.Contains("Carrot"))
+                    {
+                        editorSelectable.Selected = false;
+                        continue;
+                    }
+
+                    editorSelectable.Selected = false;
                     EditorSelectable newObject = Instantiate(editorSelectable);
                     copiedObjects.Add(newObject);
                     newObject.gameObject.SetActive(false);
-
                     editorSelectable.gameObject.SetActive(false);
                 }
 
@@ -329,7 +352,7 @@ namespace SBM_CustomLevels
                         if (ghostItem.name == "MinecartRail")
                         {
                              GameObject newRail = MinecartRailHelper.SpawnNewRail(ghostItem.transform.position);
-                            newRail.AddComponent<Outline>();
+                             newRail.AddComponent<Outline>();
                              newSelectable = newRail.AddComponent<EditorSelectable>();
                         }
                         else
@@ -395,6 +418,13 @@ namespace SBM_CustomLevels
         {
             bool objSelected = false;
 
+            foreach (EditorSelectable selectable in curSelected)
+            {
+                selectable.Selected = false;
+            }
+
+            curSelected.Clear();
+
             foreach (EditorSelectable selectable in selectableObjects)
             {
                 Vector3 screenPos = CameraController.camera.WorldToScreenPoint(selectable.transform.position);
@@ -440,6 +470,7 @@ namespace SBM_CustomLevels
 
                 bool activateWaterUI = false;
                 bool activateRailUI = false;
+                bool activateSplineUI = false;
                 bool activatePistonUI = false;
                 bool activateObjSettingsUI = false;
 
@@ -453,9 +484,13 @@ namespace SBM_CustomLevels
                     activatePistonUI = true;
                     activateObjSettingsUI = true;
                 }
-                else if (hitSelectable.GetComponent<SplineNodeData>() && hitSelectable.gameObject.name == "RailNode")
+                else if (hitSelectable.GetComponent<SplineMeshNodeData>() && hitSelectable.gameObject.name == "RailNode")
                 {
                     activateRailUI = true;
+                }
+                else if (hitSelectable.GetComponent<SplineMakerNodeData>() && hitSelectable.gameObject.name == "SplineNode")
+                { 
+                    activateSplineUI = true;
                 }
                 else if (hitSelectable.GetComponent<MeshSliceData>())
                 {
@@ -509,9 +544,15 @@ namespace SBM_CustomLevels
 
                     if (activateRailUI)
                     {
-                        EditorUI.instance.curRailNode = hitSelectable.GetComponent<SplineNodeData>();
+                        EditorUI.instance.curRailNode = hitSelectable.GetComponent<SplineMeshNodeData>();
                         EditorUI.instance.SetRailInformation();
                         EditorUI.instance.EnableRailUI(true);
+                    }
+
+                    if (activateSplineUI)
+                    {
+                        EditorUI.instance.curSplineNode = hitSelectable.GetComponent<SplineMakerNodeData>();
+                        EditorUI.instance.SetSplineInformation();
                     }
                     
                     if (activateObjSettingsUI)
@@ -557,12 +598,22 @@ namespace SBM_CustomLevels
 
                 if (activateRailUI)
                 {
-                    EditorUI.instance.curRailNode = hitSelectable.GetComponent<SplineNodeData>();
+                    EditorUI.instance.curRailNode = hitSelectable.GetComponent<SplineMeshNodeData>();
                     EditorUI.instance.SetRailInformation();
                 }
                 else
                 {
                     EditorUI.instance.curRailNode = null;
+                }
+
+                if (activateSplineUI)
+                {
+                    EditorUI.instance.curSplineNode = hitSelectable.GetComponent<SplineMakerNodeData>();
+                    EditorUI.instance.SetSplineInformation();
+                }
+                else
+                {
+                    EditorUI.instance.curSplineNode = null;
                 }
 
                 if (activateObjSettingsUI)
@@ -574,6 +625,7 @@ namespace SBM_CustomLevels
                 EditorUI.instance.EnableWaterUI(activateWaterUI);
                 EditorUI.instance.EnablePistonUI(activatePistonUI);
                 EditorUI.instance.EnableRailUI(activateRailUI);
+                EditorUI.instance.EnableSplineUI(activateSplineUI);
                 EditorUI.instance.EnableObjSettingsUI(activateObjSettingsUI);
             }
         }
@@ -713,6 +765,22 @@ namespace SBM_CustomLevels
                         mat.color = new Color(0.5f, 0, 0);
                         loadedObject.AddComponent<MeshRenderer>().material = mat;
                     }
+                    else if (defaultObject.objectName == "ScaffoldingBlock")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldingBlock, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
+                    else if (defaultObject.objectName == "ScaffoldingCorner")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldingCorner, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
+                    else if (defaultObject.objectName == "ScaffoldPanelBlack")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldPanelBlack, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
+                    else if (defaultObject.objectName == "ScaffoldPanelBrown")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldPanelBrown, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
+                    }
                     else
                     {
                         loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
@@ -783,7 +851,6 @@ namespace SBM_CustomLevels
 
                     loadedObject.transform.localScale = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1);
 
-                    Debug.Log(loadedObject.transform.localScale.ToString("F4"));
 
                     WaterDataContainer fakeWater = loadedObject.GetComponent<WaterDataContainer>();
                     fakeWater.width = waterObject.waterWidth;
@@ -844,7 +911,18 @@ namespace SBM_CustomLevels
 
                     for (int i = 0; i < flipBlock.spikesEnabled.Length; i++)
                     {
+                        flipBlock.spikesEnabled = flipBlockObject.spikesEnabled;
                         flipBlock.spikes[i].SetActive(flipBlock.spikesEnabled[i]);
+                    }
+
+                    for (int i = 0; i < flipBlock.spikes.Length; i++)
+                    {
+                        // oscillate between 0, 1, 0, -1 using Sin to determine the x position of the current spike, where 1 = right, -1 = left
+                        int xDir = (int)Math.Sin((Math.PI * i) / 2); // 0 1 0 -1
+                        int yDir = (int)Math.Cos((Math.PI * i) / 2); // 1 0 -1 0
+
+                        GameObject curSpike = flipBlock.spikes[i];
+                        curSpike.transform.localPosition = new Vector3((xDir * flipBlockObject.meshWidth) / 2, (yDir * flipBlockObject.meshHeight) / 2, curSpike.transform.localPosition.z);
                     }
 
                     flipBlock.timeBetweenFlips = flipBlockObject.flipTime;
@@ -915,6 +993,21 @@ namespace SBM_CustomLevels
             catch
             {
                 Debug.LogError("Missing railObjects in json!");
+            }
+
+            try
+            {
+                foreach (SplineObject splineObject in json.splineObjects)
+                {
+                    GameObject loadedObject = SplineMakerHelper.CreateSplineFromObject(splineObject, true);
+
+                    loadedObject.AddComponent<Outline>();
+                    loadedObject.AddComponent<EditorSelectable>();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing splineObjects in json!");
             }
            
             GameObject playerSpawn_1 = Instantiate(playerSpawn);
@@ -1048,14 +1141,17 @@ namespace SBM_CustomLevels
             Rotate,
             Scale,
             AddRailNode,
-            DeleteRailNode
+            DeleteRailNode,
+            AddSplineNode,
+            DeleteSplineNode
         }
 
         #region Undo
         /// <summary>
         /// Adds an undo event to the top of the undo stack.
         /// </summary
-        public static void AddUndo(UndoType undoType, List<EditorSelectable> editorObjects, bool wasRedo = false, SplineNodeData railNode = null)
+        public static void AddUndo(UndoType undoType, List<EditorSelectable> editorObjects, bool wasRedo = false, 
+            SplineMeshNodeData railNode = null, SplineMakerNodeData splineNode = null)
         {
             if (!wasRedo)
             {
@@ -1070,8 +1166,14 @@ namespace SBM_CustomLevels
             if (railNode)
             {
                 undo.railNode = railNode;
-                Debug.Log(railNode.spline.nodes.Count);
-                undo.railNodeIndex = railNode.spline.nodes.IndexOf(railNode.node);
+                // Debug.Log(railNode.spline.nodes.Count);
+                undo.nodeIndex = railNode.spline.nodes.IndexOf(railNode.node);
+            }
+
+            if (splineNode)
+            {
+                undo.splineNode = splineNode;
+                undo.nodeIndex = splineNode.splineParent.nodes.IndexOf(splineNode);
             }
 
             for (int i = 0; i < editorObjects.Count; i++)
@@ -1124,6 +1226,12 @@ namespace SBM_CustomLevels
                 case UndoType.DeleteRailNode:
                     UndoDeleteRailNode(undo);
                     break;
+                case UndoType.AddSplineNode:
+                    UndoAddSplineNode(undo);
+                    break;
+                case UndoType.DeleteSplineNode:
+                    UndoDeleteSplineNode(undo);
+                    break;
             }
         }
 
@@ -1146,7 +1254,7 @@ namespace SBM_CustomLevels
             foreach (EditorSelectable editorObject in undo.editorObjects)
             {
                 editorObject.gameObject.SetActive(true);
-                EditorManager.instance.selectableObjects.Add(editorObject);
+                // EditorManager.instance.selectableObjects.Add(editorObject);
             }
         }
 
@@ -1204,13 +1312,53 @@ namespace SBM_CustomLevels
 
             undo.railNode.gameObject.SetActive(true);
             
-            if (undo.railNode.spline.nodes.Count <= undo.railNodeIndex)
+            if (undo.railNode.spline.nodes.Count <= undo.nodeIndex)
             {
                 undo.railNode.spline.AddNode(undo.railNode.node);
             }
             else
             {
-                undo.railNode.spline.InsertNode(undo.railNodeIndex, undo.railNode.node);
+                undo.railNode.spline.InsertNode(undo.nodeIndex, undo.railNode.node);
+            }
+        }
+
+        private static void UndoAddSplineNode(UndoStruct undo)
+        {
+            AddRedo(UndoType.AddSplineNode, new List<EditorSelectable>(undo.editorObjects), splineNode: undo.splineNode);
+
+            undo.splineNode.gameObject.SetActive(false);
+            undo.splineNode.RemoveNode();
+        }
+
+        /// <summary>
+        /// Undoes the deletion of a SplineNode to the spline.
+        /// The SplineNode must be index 0 in the UndoStruct.editorObjects for this to work properly.
+        /// </summary>
+        private static void UndoDeleteSplineNode(UndoStruct undo)
+        {
+            AddRedo(UndoType.DeleteSplineNode, new List<EditorSelectable>(undo.editorObjects), splineNode: undo.splineNode);
+
+            undo.splineNode.gameObject.SetActive(true);
+
+            if (undo.splineNode.splineParent.nodes.Count <= undo.nodeIndex)
+            {
+                undo.splineNode.splineParent.nodes.Add(undo.splineNode);
+
+                List<Vector3> newAnchorPoints = undo.splineNode.splineParent.spline.anchorPoints.ToList();
+                newAnchorPoints.Add(undo.splineNode.transform.localPosition);
+                undo.splineNode.splineParent.spline.anchorPoints = newAnchorPoints.ToArray();
+
+                undo.splineNode.splineParent.spline.UpdatePoints();
+            }
+            else
+            {
+                undo.splineNode.splineParent.nodes.Insert(undo.nodeIndex, undo.splineNode);
+
+                List<Vector3> newAnchorPoints = undo.splineNode.splineParent.spline.anchorPoints.ToList();
+                newAnchorPoints.Insert(undo.nodeIndex, undo.splineNode.transform.localPosition);
+                undo.splineNode.splineParent.spline.anchorPoints = newAnchorPoints.ToArray();
+
+                undo.splineNode.splineParent.spline.UpdatePoints();
             }
         }
         #endregion
@@ -1220,7 +1368,7 @@ namespace SBM_CustomLevels
         /// Adds a redo event to the top of the redo stack.
         /// If the object is to be destroyed, call this method BEFORE the destruction.
         /// </summary
-        private static void AddRedo(UndoType undoType, List<EditorSelectable> editorObjects, SplineNodeData railNode = null)
+        private static void AddRedo(UndoType undoType, List<EditorSelectable> editorObjects, SplineMeshNodeData railNode = null, SplineMakerNodeData splineNode = null)
         {
             UndoStruct redo = new UndoStruct();
             redo.undoType = undoType;
@@ -1230,7 +1378,13 @@ namespace SBM_CustomLevels
             if (railNode)
             {
                 redo.railNode = railNode;
-                redo.railNodeIndex = railNode.spline.nodes.IndexOf(railNode.node);
+                redo.nodeIndex = railNode.spline.nodes.IndexOf(railNode.node);
+            }
+
+            if (splineNode)
+            {
+                redo.splineNode = splineNode;
+                redo.nodeIndex = splineNode.splineParent.nodes.IndexOf(splineNode);
             }
 
             for (int i = 0; i < editorObjects.Count; i++)
@@ -1260,6 +1414,7 @@ namespace SBM_CustomLevels
 
             UndoStruct redo = redoStack.Pop();
 
+            Debug.Log(redo.undoType.ToString());
             switch (redo.undoType)
             {
                 case UndoType.Place:
@@ -1283,6 +1438,12 @@ namespace SBM_CustomLevels
                 case UndoType.DeleteRailNode:
                     RedoDeleteRailNode(redo);
                     break;
+                case UndoType.AddSplineNode:
+                    RedoAddSplineNode(redo);
+                    break;
+                case UndoType.DeleteSplineNode:
+                    RedoDeleteSplineNode(redo);
+                    break;
             }
         }
 
@@ -1293,10 +1454,8 @@ namespace SBM_CustomLevels
             foreach (EditorSelectable editorObject in redo.editorObjects)
             {
                 editorObject.gameObject.SetActive(true);
-                EditorManager.instance.selectableObjects.Add(editorObject);
+                // EditorManager.instance.selectableObjects.Add(editorObject);
             }
-
-            Debug.Log(EditorManager.instance.curSelected.Count);
         }
 
         private static void RedoDelete(UndoStruct redo)
@@ -1349,14 +1508,15 @@ namespace SBM_CustomLevels
 
         private static void RedoAddRailNode(UndoStruct redo)
         {
+            // non-functional, InsertNode seems to use faulty logic or doesn't support this usecase (*try to fix*)
             // spline cannot have fewer than two nodes
-            if (redo.railNode.spline.nodes.Count > 2)
+            /*if (redo.railNode.spline.nodes.Count >= 2)
             {
                 AddUndo(UndoType.AddRailNode, new List<EditorSelectable>(redo.editorObjects), true, redo.railNode);
 
                 redo.railNode.gameObject.SetActive(true);
-                redo.railNode.spline.InsertNode(redo.railNodeIndex, redo.railNode.node);
-            }
+                redo.railNode.spline.InsertNode(redo.nodeIndex, redo.railNode.node); 
+            }*/
         }
 
         private static void RedoDeleteRailNode(UndoStruct redo)
@@ -1365,6 +1525,32 @@ namespace SBM_CustomLevels
 
             redo.railNode.gameObject.SetActive(false);
             redo.railNode.spline.RemoveNode(redo.railNode.node);
+        }
+
+        private static void RedoAddSplineNode(UndoStruct redo)
+        {
+            if (redo.splineNode.splineParent.nodes.Count >= 2)
+            {
+                AddUndo(UndoType.AddSplineNode, new List<EditorSelectable>(redo.editorObjects), true, splineNode: redo.splineNode);
+                
+                redo.splineNode.gameObject.SetActive(true);
+                
+                redo.splineNode.splineParent.nodes.Insert(redo.nodeIndex, redo.splineNode);
+
+                List<Vector3> newAnchorPoints = redo.splineNode.splineParent.spline.anchorPoints.ToList();
+                newAnchorPoints.Insert(redo.nodeIndex, redo.splineNode.transform.localPosition);
+                redo.splineNode.splineParent.spline.anchorPoints = newAnchorPoints.ToArray();
+
+                redo.splineNode.splineParent.spline.UpdatePoints();
+            }
+        }
+
+        private static void RedoDeleteSplineNode(UndoStruct redo)
+        {
+            AddUndo(UndoType.DeleteSplineNode, new List<EditorSelectable>(redo.editorObjects), true, splineNode: redo.splineNode);
+
+            redo.splineNode.gameObject.SetActive(false);
+            redo.splineNode.RemoveNode();
         }
         #endregion
 
@@ -1383,9 +1569,11 @@ namespace SBM_CustomLevels
             public List<EditorSelectable> editorObjects;
             public List<UndoObject> undoObjects;
 
-            // minecart raile specific, can be ignored otherwise
-            public SplineNodeData railNode;
-            public int railNodeIndex;
+            // minecart rail specific, can be ignored otherwise
+            public SplineMeshNodeData railNode;
+            // spline node specific, can be ignored otherwise
+            public SplineMakerNodeData splineNode;
+            public int nodeIndex;
         }
 
         public struct UndoObject

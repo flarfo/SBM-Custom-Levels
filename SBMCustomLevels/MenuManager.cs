@@ -160,7 +160,7 @@ namespace SBM_CustomLevels
                     }
                     else
                     {
-                        instance.CreateNewLevel(world);
+                        instance.CreateNewLevel(world, true);
                         return;
                     }
 
@@ -333,7 +333,7 @@ namespace SBM_CustomLevels
             worldCount++;
         }
 
-        private void CreateNewLevel(World world)
+        private void CreateNewLevel(World world, bool emptyWorld = false)
         {
             //string[] levels = Directory.GetFiles(worldPath);
             string levelName = "";
@@ -363,10 +363,16 @@ namespace SBM_CustomLevels
             {
                 using (File.Create(path)) { }
 
-                selectedWorld.UpdateLevels();
+                world.UpdateLevels();
 
                 instance.UpdateWorldButtons();
                 instance.UpdateLevelButtons();
+            }
+
+            if (emptyWorld)
+            {
+                customWorldSelector.GetComponent<UITransitioner>().Transition_Out_To_Right();
+                customLevelSelector.GetComponent<UITransitioner>().Transition_In_From_Top();
             }
         }
 
