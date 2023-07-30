@@ -7,7 +7,7 @@
 [![YouTube](https://img.shields.io/youtube/channel/subscribers/UCCdz54phrEf-6Bc0KCTmfgw?label=flarfo&logo=Youtube&style=plastic)](https://www.youtube.com/@flarfo/)
 
 ## About
-SBM Custom Levels is a mod for Super Bunny Man that allows users to create and play new and exciting levels, including those in the style of the unreleased World 5!
+SBM Custom Levels is a mod for Super Bunny Man that allows users to create and play new and exciting levels!
 
 [Installation](#manual-installation)
 
@@ -47,6 +47,7 @@ Video Install Guide: https://youtu.be/qNPceLrAVE8
 ### Keybinds
 | Keybind | Effect |
 :--------:|:--------:
+Q | Toggels stamp tool
 W | Toggles move tool
 E | Toogles select tool
 Left Mouse | Select/move
@@ -77,6 +78,13 @@ Ctrl+Left Click | Adds/removes object from selection
 ### Water
 - Each water object can be selected to reveal the **Water Keyframes Inspector**. This allows you to configure how the water moves.
 - Set Time/Value pairs to set the height of the water at a specific time. This will be animated automatically in game.
+- X-Button deletes the last keyframe in the inspector.
+- Add-Button adds a new keyframe to the bottom, **maximum of 16 keyframes**.
+
+### Pistons
+- Each piston object can be selected to reveal the **Piston Keyframes Inspector**. This allows you to configure how the piston moves.
+- Set Time/Value pairs to set the extension of the piston at a specific time. This will be animated automatically in game.
+- Normalized so that value of 1 = max extension.
 - X-Button deletes the last keyframe in the inspector.
 - Add-Button adds a new keyframe to the bottom, **maximum of 16 keyframes**.
 
