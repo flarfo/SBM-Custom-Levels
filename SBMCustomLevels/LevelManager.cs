@@ -47,6 +47,15 @@ namespace SBM_CustomLevels
 
         public string PreviousSceneName { get; private set; }
 
+        public enum LevelType 
+        { 
+            Editor,
+            Story,
+            Basketball,
+            Deathmatch,
+            CarrotGrab
+        }
+
         private void Awake()
         {
             if (instance == null)
@@ -63,7 +72,7 @@ namespace SBM_CustomLevels
             }
         }
 
-        private void LoadLevel(bool isEditor, bool newLevel, string path)
+        private void LoadLevel(bool isEditor, bool newLevel, string path, LevelType levelType)
         {
             lastLevelWasEditor = isEditor;
 
@@ -115,10 +124,27 @@ namespace SBM_CustomLevels
                     SceneSystem.TargetSceneIndex = 255;
 
                     lastWorldStyle = worldStyle;
-                    worldStyle = LoadJSONLevel(path);
+                    worldStyle = LoadJSONLevel(path, levelType);
                 }
 
-                Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject); //must happen AFTER carrot is loaded in, otherwise some stuff is goofed^
+                switch (levelType)
+                {
+                    //must happen AFTER carrot is loaded in, otherwise some stuff is goofed^
+                    case LevelType.Editor:
+                    case LevelType.Story:
+                        Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject);
+                        break;
+                    case LevelType.Basketball:
+                        Instantiate(Resources.Load("prefabs/level/LevelPrefab_Basketball") as GameObject);
+                        break;
+                    case LevelType.Deathmatch:
+                        Instantiate(Resources.Load("prefabs/level/LevelPrefab_Deathmatch") as GameObject);
+                        break;
+                    case LevelType.CarrotGrab:
+                        Instantiate(Resources.Load("prefabs/level/LevelPrefab_CarrotGrab") as GameObject);
+                        break;
+                }
+
 
                 if (isEditor)
                 {
@@ -162,68 +188,7 @@ namespace SBM_CustomLevels
             }
         }
 
-        /*private void LoadLevel(bool isEditor, bool newLevel, string path)
-        {
-            LoadLevelScene(path, isEditor);
-
-            int worldStyle = 1;
-
-            if (isEditor)
-            {
-                if (newLevel)
-                {
-                    EditorManager.LoadNewEditorLevel();
-                }
-                else
-                {
-                    EditorManager.LoadEditorLevel(path);
-                }
-
-                EditorManager.instance.InitializeEditor();
-            }
-            else
-            {
-                lastWorldStyle = worldStyle;
-                worldStyle = LoadJSONLevel(path);
-            }
-
-            Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject); //must happen AFTER carrot is loaded in, otherwise some stuff is goofed^
-
-            if (isEditor)
-            {
-                //add camera controller, (camera loaed in LevelPrefab_Story), moved from InitializeEditor as camera didnt exist previously...)
-                Camera.main.gameObject.AddComponent<CameraController>();
-
-                EditorManager.instance.editorCamera = Camera.main;
-
-                Destroy(GameObject.Find("Player 1"));
-                GameObject player2 = GameObject.Find("Player 2");
-                if (player2)
-                {
-                    Destroy(player2);
-                }
-
-                SBM.Shared.Audio.AudioSystem.FadeOutMusicVolume();
-            }
-            else
-            {
-                //play correct music for world style (based on world background selected)
-                SBM.Shared.Audio.Song song = SBM.Shared.Level.LevelSystem.GetWorld(worldStyle - 1).Song;
-
-                bool playIntro = true;
-
-                // if last world style is different, play intro
-                // if last world style is same, dont play intro
-                if (lastWorldStyle == worldStyle)
-                {
-                    playIntro = false;
-                }
-
-                SBM.Shared.Audio.AudioSystem.instance.ScheduleSong(song, playIntro);
-            }
-        }*/
-
-        private int LoadJSONLevel(string path)
+        private int LoadJSONLevel(string path, LevelType levelType)
         {
             Debug.Log(path);
 
@@ -312,18 +277,22 @@ namespace SBM_CustomLevels
                     }
                 }
 
-                if (!wormholeLoaded)
+                // ensure that wormhole and carrot always exist to avoid crash (only important for StoryLevels)
+                if (levelType == LevelType.Story)
                 {
-                    Debug.LogError("Missing wormhole in json! Instantiating default wormhole!");
+                    if (!wormholeLoaded)
+                    {
+                        Debug.LogError("Missing wormhole in json! Instantiating default wormhole!");
 
-                    GameObject wormhole = Instantiate(Resources.Load(RecordLevel.NameToPath("Wormhole"))) as GameObject;
-                    wormhole.transform.position = new Vector3(5, 0, 0);
-                }
+                        GameObject wormhole = Instantiate(Resources.Load(RecordLevel.NameToPath("Wormhole"))) as GameObject;
+                        wormhole.transform.position = new Vector3(5, 0, 0);
+                    }
 
-                if (!carrotLoaded)
-                {
-                    Debug.LogError("Missing carrot in json! Instantiating default carrot!");
-                    Instantiate(Resources.Load(RecordLevel.NameToPath("Carrot")));
+                    if (!carrotLoaded)
+                    {
+                        Debug.LogError("Missing carrot in json! Instantiating default carrot!");
+                        Instantiate(Resources.Load(RecordLevel.NameToPath("Carrot")));
+                    }
                 }
             }
             catch
@@ -509,6 +478,30 @@ namespace SBM_CustomLevels
                 Debug.LogError("Missing splineObjects in json!");
             }
 
+            try
+            {
+                foreach (ColorBlockObject colorBlockObject in json.colorBlockObjects)
+                {
+                    GameObject loadedObject;
+
+                    if (colorBlockObject.isCorner)
+                    {
+                        loadedObject = Instantiate(EditorManager.colorBlockCorner, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+                    else
+                    {
+                        loadedObject = Instantiate(EditorManager.colorBlock, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+
+                    loadedObject.transform.localScale = colorBlockObject.GetScale();
+                    loadedObject.GetComponent<MeshRenderer>().material.color = new Color32((byte)colorBlockObject.r, (byte)colorBlockObject.g, (byte)colorBlockObject.b, 255);
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing colorBlockObjects in json!");
+            }
+
             GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_1.transform.position = spawnPos_1;
 
@@ -517,6 +510,28 @@ namespace SBM_CustomLevels
 
             if (SBM.Shared.Networking.NetworkSystem.IsInSession)
             {
+                // setup all profiles for CO-OP play, modified version of SBM.UI.Components.UIPlayerRoster.ConfigureCoopPlayersForNetworkPlay()
+
+                if (SBM.Shared.Networking.NetworkSystem.IsHost)
+                {
+                    var localProfile = SBM.Shared.PlayerRoster.GetProfile(1);
+                    var localUserId = SBM.Shared.Networking.NetworkSystem.LocalUserId;
+                    string localUsername = SBM.Shared.Networking.NetworkSystem.LocalUsername;
+
+                    localProfile.Overwrite(0, 0, SBM.Shared.Team.Red, localUserId, true, localUsername);
+
+                    for (int i = 2; i < MultiplayerManager.playerCount; i++)
+                    {
+                        Debug.Log("Creating Profile... " + i);
+
+                        var profile = SBM.Shared.PlayerRoster.GetProfile(i);
+                        var remoteUserId = SBM.Shared.Networking.NetworkSystem.GetRemoteUserId(0);
+                        string username = SBM.Shared.Networking.NetworkSystem.GetUsername(remoteUserId);
+
+                        profile.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId, false, username);
+                    }
+                }
+                
                 SBM.Shared.Networking.NetworkSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
                 SBM.Shared.Level.LevelSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
             }
@@ -526,7 +541,7 @@ namespace SBM_CustomLevels
             return worldStyle;
         }
 
-        public void BeginLoadLevel(bool isEditor, bool newLevel, string path, int level, World world = null)
+        public void BeginLoadLevel(bool isEditor, bool newLevel, string path, int level, LevelType levelType, World world = null)
         {
             if (!File.Exists(path))
             {
@@ -561,7 +576,7 @@ namespace SBM_CustomLevels
 
                 currentLevel = path;
 
-                if (!LevelManager.InLevel)
+                if (!LevelManager.InLevel && levelType == LevelType.Story)
                 {
                     SBM.Shared.Cameras.MenuCamera menuCamera = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<SBM.Shared.Cameras.MenuCamera>();
                     menuCamera.targetPos = new Vector3(-0.715f, 4.05f, 21.96f);
@@ -569,7 +584,7 @@ namespace SBM_CustomLevels
 
                     SBM.UI.Utilities.Focus.UIFocusable.FocusedObject.gameObject.transform.parent.GetComponent<SBM.UI.Utilities.Transitioner.UITransitioner>().Transition_Out_To_Right(); //parent of level button is level selector
                     SBM.UI.Utilities.Focus.UIFocusable.ReleaseFocusedObject();
-                    wormholeManager.WormholeAnimation(path, level);
+                    wormholeManager.WormholeAnimation(path, level, levelType);
                 }
                 else
                 {
@@ -577,7 +592,7 @@ namespace SBM_CustomLevels
 
                     SceneSystem.Unload(PreviousSceneName).completed += delegate (AsyncOperation o)
                     {
-                        LoadLevel(isEditor, newLevel, path);
+                        LoadLevel(isEditor, newLevel, path, levelType);
                     };
 
                 }   
@@ -586,7 +601,7 @@ namespace SBM_CustomLevels
             {
                 SceneSystem.Unload(PreviousSceneName).completed += delegate (AsyncOperation o)
                 {
-                    LoadLevel(isEditor, newLevel, path);
+                    LoadLevel(isEditor, newLevel, path, levelType);
                 };
             }
         }
@@ -667,6 +682,7 @@ namespace SBM_CustomLevels
 
             private int level;
             private string path;
+            private LevelType levelType;
 
             private void Awake()
             {
@@ -681,12 +697,13 @@ namespace SBM_CustomLevels
                 }
             }
 
-            public void WormholeAnimation(string _path, int _level)
+            public void WormholeAnimation(string _path, int _level, LevelType _levelType)
             {
                 ragdolls = GameObject.Find("Ragdolls (Story Mode)").GetComponent<SBM.UI.MainMenu.StoryMode.UIStoryModeRagdolls>();
 
                 path = _path;
                 level = _level;
+                levelType = _levelType;
 
                 if (ragdolls.cTransitionOutToSelectedLevel != null)
                 {
@@ -838,7 +855,7 @@ namespace SBM_CustomLevels
                                 LevelManager.InLevel = true;
                                 LevelManager.instance.levelNumber = transitionManager.level;
 
-                                LevelManager.instance.LoadLevel(false, false, transitionManager.path);
+                                LevelManager.instance.LoadLevel(false, false, transitionManager.path, transitionManager.levelType);
                             };
 
                             return false;

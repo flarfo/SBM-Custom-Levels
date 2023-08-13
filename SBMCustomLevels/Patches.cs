@@ -363,7 +363,7 @@ namespace SBM_CustomLevels
 		// however for custom levels no scene exists.
 		[HarmonyPatch(typeof(SBM.Objects.GameModes.Story.GameManagerStory), "Start")]
         [HarmonyPrefix]
-		static bool FixGameStartPatch(SBM.Objects.GameModes.Story.GameManagerStory __instance)
+		static bool FixStoryStartPatch(SBM.Objects.GameModes.Story.GameManagerStory __instance)
         {
 			if (LevelManager.InLevel)
             {
@@ -376,6 +376,13 @@ namespace SBM_CustomLevels
 			}
 
 			return true;
+        }
+
+        [HarmonyPatch(typeof(SBM.Objects.GameModes.Basketball.Basketball), "Start")]
+        [HarmonyPrefix]
+		static bool FixBasketball()
+        {
+			return !EditorManager.InEditor;
         }
 
 		// dont unlock badges for custom levels (which don't have normal badges) /// NullReferenceException
@@ -437,7 +444,7 @@ namespace SBM_CustomLevels
                 {
 					try
 					{
-						LevelManager.instance.BeginLoadLevel(false, false, nextLevel, -1);
+						LevelManager.instance.BeginLoadLevel(false, false, nextLevel, -1, LevelManager.LevelType.Story);
 
 						int levelNumber = ushort.MaxValue;
 

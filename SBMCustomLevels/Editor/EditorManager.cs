@@ -24,6 +24,8 @@ namespace SBM_CustomLevels
         public static GameObject scaffoldingCorner;
         public static GameObject scaffoldPanelBlack;
         public static GameObject scaffoldPanelBrown;
+        public static GameObject colorBlock;
+        public static GameObject colorBlockCorner;
 
         public List<EditorSelectable> selectableObjects = new List<EditorSelectable>();
 
@@ -101,11 +103,42 @@ namespace SBM_CustomLevels
 
         private void Update()
         {
+            // debug
+            /*if (Input.GetKeyDown(KeyCode.PageDown))
+            {
+                if (!SBM.Shared.Networking.NetworkSystem.IsInSession)
+                {
+                    return;
+                }
+
+                if (SBM.Shared.Networking.NetworkSystem.IsHost)
+                {
+                    SBM.Shared.Networking.NetworkSystem.InviteViaServiceOverlay();
+
+                    if (MultiplayerManager.playerCount > 1)
+                    {
+                        // SBM.Shared.Networking.NetworkSystem.InviteViaServiceOverlay();
+                    }
+                }
+            }
+            
+            // debug
+            if (Input.GetKeyDown(KeyCode.PageUp))
+            {
+                foreach (var player in SBM.Shared.PlayerRoster.profiles)
+                {
+                    Debug.Log($"{player.BaseUsername} {player.PlayerNumber}: Device {player.InputDeviceIndex}");
+                }
+
+                Debug.Log("Player Count: " + MultiplayerManager.playerCount);
+            }
+            // end*/
+
             if (!inEditor || !editorUI)
             {
                 return;
             }
-
+            
             bool ctrlClicked = false;
 
             if (Input.GetKey(KeyCode.LeftControl))
@@ -282,17 +315,6 @@ namespace SBM_CustomLevels
                 curSelected.Clear();
             }
 
-            // move ghostItem with mouse cursor
-            if (ghostItem)
-            {
-                ghostItem.MoveObjectToMouse(snapVector);
-
-                if (stampTool)
-                {
-                    ghostItem.SetInspectorInfo(true, false, false);
-                }
-            }
-
             // if pointer is over UI, no need to check 3D world for input
             if (EventSystem.current.IsPointerOverGameObject())
             {
@@ -372,6 +394,17 @@ namespace SBM_CustomLevels
                     }
 
                     return;
+                }
+            }
+
+            // move ghostItem with mouse cursor
+            if (ghostItem)
+            {
+                ghostItem.MoveObjectToMouse(snapVector);
+
+                if (stampTool)
+                {
+                    ghostItem.SetInspectorInfo(true, false, false);
                 }
             }
 
@@ -473,6 +506,7 @@ namespace SBM_CustomLevels
                 bool activateSplineUI = false;
                 bool activatePistonUI = false;
                 bool activateObjSettingsUI = false;
+                bool activateColorUI = false;
 
                 //check if water/minecart/flipblock etc to enable custom UI
                 if (hitSelectable.GetComponent<WaterDataContainer>())
@@ -496,6 +530,10 @@ namespace SBM_CustomLevels
                 {
                     activateObjSettingsUI = true;
                 }
+                else if (hitSelectable.GetComponent<ColorData>())
+                {
+                    activateColorUI = true;
+                }
 
                 //if control pressed, already selected objects will be deselected, nonselected objects will be appended to selection
                 if (ctrlClicked)
@@ -512,6 +550,7 @@ namespace SBM_CustomLevels
                             EditorUI.instance.EnablePistonUI(false);
                             EditorUI.instance.EnableRailUI(false);
                             EditorUI.instance.EnableObjSettingsUI(false);
+                            EditorUI.instance.EnableColorUI(false);
 
                             EditorUI.instance.curWater = null;
                             EditorUI.instance.curPiston = null;
@@ -559,6 +598,12 @@ namespace SBM_CustomLevels
                     {
                         EditorUI.instance.EnableObjSettingsUI(true);
                         EditorUI.instance.SetObjSettingsInformation(hitSelectable.gameObject);
+                    }
+
+                    if (activateColorUI)
+                    {
+                        EditorUI.instance.EnableColorUI(true);
+                        EditorUI.instance.SetColorInformation(hitSelectable.gameObject);
                     }
 
                     return;
@@ -621,12 +666,18 @@ namespace SBM_CustomLevels
                     EditorUI.instance.SetObjSettingsInformation(hitSelectable.gameObject);
                 }
 
+                if (activateColorUI)
+                {
+                    EditorUI.instance.SetColorInformation(hitSelectable.gameObject);
+                }
+
                 EditorUI.instance.EnableInspector(true);
                 EditorUI.instance.EnableWaterUI(activateWaterUI);
                 EditorUI.instance.EnablePistonUI(activatePistonUI);
                 EditorUI.instance.EnableRailUI(activateRailUI);
                 EditorUI.instance.EnableSplineUI(activateSplineUI);
                 EditorUI.instance.EnableObjSettingsUI(activateObjSettingsUI);
+                EditorUI.instance.EnableColorUI(activateColorUI);
             }
         }
 
@@ -1008,6 +1059,38 @@ namespace SBM_CustomLevels
             catch
             {
                 Debug.LogError("Missing splineObjects in json!");
+            }
+
+            try
+            {
+                foreach (ColorBlockObject colorBlockObject in json.colorBlockObjects)
+                {
+                    GameObject loadedObject;
+
+                    if (colorBlockObject.isCorner)
+                    {
+                        loadedObject = Instantiate(colorBlockCorner, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+                    else
+                    {
+                        loadedObject = Instantiate(colorBlock, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+
+                    Color32 color = new Color32((byte)colorBlockObject.r, (byte)colorBlockObject.g, (byte)colorBlockObject.b, 255);
+
+                    ColorData colorData = loadedObject.GetComponent<ColorData>();
+                    colorData.color = color;
+
+                    loadedObject.transform.localScale = colorBlockObject.GetScale();
+                    loadedObject.GetComponent<MeshRenderer>().material.color = color;
+
+                    loadedObject.AddComponent<Outline>();
+                    loadedObject.AddComponent<EditorSelectable>();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing colorBlockObjects in json!");
             }
            
             GameObject playerSpawn_1 = Instantiate(playerSpawn);

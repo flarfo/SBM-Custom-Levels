@@ -76,6 +76,11 @@ namespace SBM_CustomLevels
             EditorManager.outlineMask = sbmBundle.LoadAsset<Material>("OutlineMask");
             EditorManager.outlineFill = sbmBundle.LoadAsset<Material>("OutlineFill");
 
+            EditorManager.colorBlock = sbmBundle.LoadAsset<GameObject>("ColorBlock");
+            EditorManager.colorBlockCorner = sbmBundle.LoadAsset<GameObject>("ColorBlockCorner");
+            EditorManager.colorBlock.AddComponent<ColorData>();
+            EditorManager.colorBlockCorner.AddComponent<ColorData>();
+
             MinecartRailHelper.railSplineTile = sbmBundle.LoadAsset<Mesh>("RailSplineTile");
             MinecartRailHelper.railMaterial = sbmBundle.LoadAsset<Material>("MinecartRail");
             MinecartRailHelper.railNodeHandle = sbmBundle.LoadAsset<GameObject>("RailNode");

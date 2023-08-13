@@ -80,7 +80,7 @@ namespace SBM_CustomLevels
 
             if (EditorManager.instance.snapEnabled)
             {
-                Vector2 snappedPos = new Vector3();
+                Vector2 snappedPos = new Vector2();
 
                 if (snapVector.x == 0)
                 {

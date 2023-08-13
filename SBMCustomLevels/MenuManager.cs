@@ -192,11 +192,11 @@ namespace SBM_CustomLevels
 
                             if (File.ReadAllBytes(level).Length != 0)
                             {
-                                LevelManager.instance.BeginLoadLevel(true, false, level, 0); // if level is not empty, load as existing level
+                                LevelManager.instance.BeginLoadLevel(true, false, level, 0, LevelManager.LevelType.Editor); // if level is not empty, load as existing level
                             }
                             else
                             {
-                                LevelManager.instance.BeginLoadLevel(true, true, level, 0); // if level is empty, load as new level (create carrot, prefabs, etc.)
+                                LevelManager.instance.BeginLoadLevel(true, true, level, 0, LevelManager.LevelType.Editor); // if level is empty, load as new level (create carrot, prefabs, etc.)
                             }
                         });
 
@@ -241,11 +241,11 @@ namespace SBM_CustomLevels
 
                     if (File.ReadAllBytes(level).Length != 0)
                     {
-                        LevelManager.instance.BeginLoadLevel(true, false, level, 0); // if level is not empty, load as existing level
+                        LevelManager.instance.BeginLoadLevel(true, false, level, 0, LevelManager.LevelType.Editor); // if level is not empty, load as existing level
                     }
                     else
                     {
-                        LevelManager.instance.BeginLoadLevel(true, true, level, 0); // if level is empty, load as new level (create carrot, prefabs, etc.)
+                        LevelManager.instance.BeginLoadLevel(true, true, level, 0, LevelManager.LevelType.Editor); // if level is empty, load as new level (create carrot, prefabs, etc.)
                     }
                 });
 
@@ -309,11 +309,11 @@ namespace SBM_CustomLevels
             newCondition.Focusable = worldUI;
             newCondition.AnimateWhen = UI.Utilities.Focus.UIFocusableConditionHandler.ConditionType.NotFocused;
             
-            UI.Utilities.Focus.UIFocusableColorShift arrowLeft = FindInactiveGameObject<UI.Utilities.Focus.UIFocusableColorShift>("Arrow_Left");
-            arrowLeft.conditions = arrowLeft.conditions.Append(newCondition).ToArray();
+            //UI.Utilities.Focus.UIFocusableColorShift arrowLeft = FindInactiveGameObject<UI.Utilities.Focus.UIFocusableColorShift>("Arrow_Left");
+            //arrowLeft.conditions = arrowLeft.conditions.Append(newCondition).ToArray();
 
-            UI.Utilities.Focus.UIFocusableColorShift arrowRight = FindInactiveGameObject<UI.Utilities.Focus.UIFocusableColorShift>("Arrow_Right");
-            arrowRight.conditions = arrowRight.conditions.Append(newCondition).ToArray();
+            //UI.Utilities.Focus.UIFocusableColorShift arrowRight = FindInactiveGameObject<UI.Utilities.Focus.UIFocusableColorShift>("Arrow_Right");
+            //arrowRight.conditions = arrowRight.conditions.Append(newCondition).ToArray();
             
             UITransitionerCarousel worldNamesTransitioner = FindInactiveGameObject<UITransitionerCarousel>("World Names");
             GameObject worldName_1 = FindInactiveGameObject<UI.Components.UI_SBMTheme_Text>("Text_WorldTitle_1").gameObject;
@@ -340,8 +340,6 @@ namespace SBM_CustomLevels
 
             for (int i = 0; i < world.levels.Count + 1; i++)
             {
-                Debug.Log(i);
-
                 if (i >= 10)
                 {
                     return;
@@ -662,11 +660,11 @@ namespace SBM_CustomLevels
                     {
                         // send world identifier to all other players when in network. levelID.levelNumber - 1, since levelID.levelNumber starts at 1 rather than 0.
                         MultiplayerManager.SendCustomLevelData(levelID.world.WorldHash, levelID.levelNumber - 1);
-                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber, levelID.world);
+                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber, LevelManager.LevelType.Story, levelID.world);
                     }
                     else
                     {
-                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber, levelID.world);
+                        LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber, LevelManager.LevelType.Story, levelID.world);
                     }
 
                     return false;
@@ -675,6 +673,54 @@ namespace SBM_CustomLevels
                 {
                     return false;
                 }
+            }
+
+            return true;
+        }
+
+        [HarmonyPatch(typeof(SBM.UI.MainMenu.PartyMode.UIPartyModeLevels), "TransitionOutToLevel")]
+        [HarmonyPrefix]
+        static bool OverridePartyLevelSelect(SBM.UI.MainMenu.PartyMode.UIPartyModeLevels __instance)
+        {
+            if (__instance.screenFader.IsFading)
+            {
+                return false;
+            }
+
+            // if custom level
+            //if (__instance.selectedLevelIndex >= 5)
+            if (true)
+            {
+                if (SBM.Shared.Networking.NetworkSystem.IsInSession && SBM.Shared.Networking.NetworkSystem.IsHost && SBM.Shared.Networking.NetworkSystem.RemoteUserCount <= 0)
+                {
+                    SBM.Shared.Networking.NetworkSystem.EndSession();
+                    Debug.Log("Ended network session before starting party mode level (there were no remote users!).");
+                }
+
+                LevelManager.LevelType levelType;
+
+                switch (SBM.Shared.GameMode.Current)
+                {
+                    case SBM.Shared.GameModeType.Basketball:
+                        levelType = LevelManager.LevelType.Basketball;
+                        break;
+                    case SBM.Shared.GameModeType.Deathmatch:
+                        levelType = LevelManager.LevelType.Deathmatch;
+                        break;
+                    case SBM.Shared.GameModeType.CarrotGrab:
+                        levelType = LevelManager.LevelType.CarrotGrab;
+                        break;
+                    default:
+                        levelType = LevelManager.LevelType.Deathmatch;
+                        break;
+                }
+
+                __instance.screenFader.FadeOut();
+                // debug
+                LevelManager.instance.BeginLoadLevel(false, false, @"C:\Program Files (x86)\Steam\steamapps\common\Super Bunny Man\testbasketball\1.sbm", 0, levelType);
+                __instance.onTransitionOutToLevel.Invoke();
+
+                return false;
             }
 
             return true;

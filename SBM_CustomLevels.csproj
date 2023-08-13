@@ -163,8 +163,10 @@
     <Compile Include="SBMCustomLevels\Editor\EditorManager.cs" />
     <Compile Include="SBMCustomLevels\Editor\EditorSelectable.cs" />
     <Compile Include="SBMCustomLevels\Editor\EditorUI.cs" />
+    <Compile Include="SBMCustomLevels\Object Wrappers\ColorBlockObject.cs" />
     <Compile Include="SBMCustomLevels\Object Wrappers\SplineObject.cs" />
     <Compile Include="SBMCustomLevels\Object Wrappers\TubeRendererObject.cs" />
+    <Compile Include="SBMCustomLevels\Objects\ColorData.cs" />
     <Compile Include="SBMCustomLevels\Objects\PistonDataContainer.cs" />
     <Compile Include="SBMCustomLevels\Objects\SplineMakerHelper.cs" />
     <Compile Include="SBMCustomLevels\Objects\SplineMakerNodeData.cs" />
