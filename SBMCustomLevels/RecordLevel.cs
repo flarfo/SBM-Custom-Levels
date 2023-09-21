@@ -89,13 +89,34 @@ namespace SBM_CustomLevels
 
             string worldStyle = EditorManager.instance.worldStyle.ToString();
             Debug.Log("World Style: " + worldStyle);
-            var carrot = FindObjectOfType<SBM.Objects.Common.Carrot.Carrot>();
-            var wormhole = FindObjectOfType<SBM.Objects.Common.Wormhole.Wormhole>();
+
             var p1 = GameObject.Find("PlayerSpawn_1");
             var p2 = GameObject.Find("PlayerSpawn_2");
+            var p3 = GameObject.Find("PlayerSpawn_3");
+            var p4 = GameObject.Find("PlayerSpawn_4");
 
             FloatObject spawnPos1 = new FloatObject(p1);
             FloatObject spawnPos2 = new FloatObject(p2);
+            FloatObject spawnPos3;
+            FloatObject spawnPos4;
+
+            if (!p3)
+            {
+                spawnPos3 = new FloatObject(new Vector3(0, 0, -999));
+            }
+            else
+            {
+                spawnPos3 = new FloatObject(p3);
+            }
+
+            if (!p4)
+            {
+                spawnPos4 = new FloatObject(new Vector3(0, 0, -999));
+            }
+            else
+            {
+                spawnPos4 = new FloatObject(p4);
+            }
 
             for (int i = 0; i < objects.Length; i++)
             {
@@ -137,7 +158,7 @@ namespace SBM_CustomLevels
 
             string filePath = Path.Combine(LevelLoader_Mod.levelsPath, EditorManager.instance.selectedLevel);
 
-            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, defaultObjects, waterObjects, 
+            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, spawnPos3, spawnPos4, defaultObjects, waterObjects, 
                 meshSliceObjects, flipBlockObjects, pistonObjects, railObjects, splineObjects, colorBlockObjects), Formatting.Indented) });
         }
 
