@@ -22,6 +22,13 @@ namespace SBM_CustomLevels
             position[2] = gameObject.transform.position.z;
         }
 
+        public FloatObject(Vector3 pos)
+        {
+            position[0] = pos.x;
+            position[1] = pos.y;
+            position[2] = pos.z;
+        }
+
         public Vector3 GetPosition()
         {
             return new Vector3(position[0], position[1], position[2]);
