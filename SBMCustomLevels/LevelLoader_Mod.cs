@@ -18,6 +18,9 @@ namespace SBM_CustomLevels
         private readonly string pluginVersion = "0.0.1";
 
         public static string levelsPath = Path.Combine(Path.GetDirectoryName(Application.dataPath), "levels");
+        public static string deathmatchPath = Path.Combine(levelsPath, "Deathmatch");
+        public static string basketballPath = Path.Combine(levelsPath, "Basketball");
+        public static string carrotGrabPath = Path.Combine(levelsPath, "Carrot Grab");
 
         public static List<World> worldsList = new List<World>();
 
@@ -44,6 +47,21 @@ namespace SBM_CustomLevels
                 Directory.CreateDirectory(levelsPath);
             }
 
+            if (!Directory.Exists(basketballPath))
+            {
+                Directory.CreateDirectory(basketballPath);
+            }
+
+            if (!Directory.Exists(deathmatchPath))
+            {
+                Directory.CreateDirectory(deathmatchPath);
+            }
+
+            if (!Directory.Exists(carrotGrabPath))
+            {
+                Directory.CreateDirectory(carrotGrabPath);
+            }
+
             UpdateWorldsList();
 
             GameObject levelManager = new GameObject("LevelManager", typeof(LevelManager));
@@ -68,6 +86,7 @@ namespace SBM_CustomLevels
 
             EditorManager.iceSledSpikesGuide = sbmBundle.LoadAsset<GameObject>("IceSledSpikesGuide");
             EditorManager.playerSpawn = sbmBundle.LoadAsset<GameObject>("PlayerSpawn");
+
             EditorManager.scaffoldingBlock = sbmBundle.LoadAsset<GameObject>("ScaffoldingBlock");
             EditorManager.scaffoldingCorner = sbmBundle.LoadAsset<GameObject>("ScaffoldingCorner");
             EditorManager.scaffoldPanelBlack = sbmBundle.LoadAsset<GameObject>("ScaffoldPanelBlack");
@@ -89,6 +108,11 @@ namespace SBM_CustomLevels
             SplineMakerHelper.splineMaterial = sbmBundle.LoadAsset<Material>("ScaffoldPlatform");
 
             sbmBundle.Unload(false);
+
+            EditorManager.playerSpawn.layer = 5; // UI layer for no collision
+            MinecartRailHelper.railNodeHandle.layer = 5; // UI layer for no collision
+            SplineMakerHelper.splineNodeHandle.layer = 5; // UI layer for no collision
+            Physics.IgnoreLayerCollision(5, 0);
         }
         
         public static void UpdateWorldsList()
@@ -158,7 +182,7 @@ namespace SBM_CustomLevels
 
     public sealed class World
     {
-        public List<string> levels = new List<string>();
+        public List<Level> levels = new List<Level>();
         public string worldPath;
 
         private string _name;
@@ -189,9 +213,19 @@ namespace SBM_CustomLevels
 
         public void UpdateLevels()
         {
+            levels.Clear();
+
             if (Directory.Exists(worldPath))
             {
-                levels = Directory.GetFiles(worldPath, "*.sbm").ToList();
+                foreach (var dir in Directory.GetFiles(worldPath, "*.sbm"))
+                {
+                    string fileName = Path.GetFileNameWithoutExtension(dir);
+
+                    if (ulong.TryParse(fileName, out ulong result))
+                    {
+                        levels.Add(new Level(dir, result));
+                    }
+                }
             }
         }
 
@@ -293,6 +327,18 @@ namespace SBM_CustomLevels
             }
             
             return final;
+        }
+    }
+
+    public sealed class Level
+    {
+        public string levelPath;
+        public ulong levelHash;
+
+        public Level(string _levelPath, ulong _levelHash = 0)
+        {
+            levelPath = _levelPath;
+            levelHash = _levelHash;
         }
     }
 }
