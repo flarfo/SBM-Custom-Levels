@@ -9,6 +9,8 @@ namespace SBM_CustomLevels
     {
         public FloatObject spawnPosition1;
         public FloatObject spawnPosition2;
+        public FloatObject spawnPosition3;
+        public FloatObject spawnPosition4;
 
         public List<DefaultObject> defaultObjects;
         public List<WaterObject> waterObjects;
@@ -25,12 +27,15 @@ namespace SBM_CustomLevels
 
         }
 
-        public ObjectContainer(FloatObject pos1, FloatObject pos2, List<DefaultObject> _defaultObjects, List<WaterObject> _waterObjects, 
+        public ObjectContainer(FloatObject pos1, FloatObject pos2, FloatObject pos3, FloatObject pos4, List<DefaultObject> _defaultObjects, List<WaterObject> _waterObjects, 
             List<MeshSliceObject> _meshSliceObjects, List<FlipBlockObject> _flipBlockObjects, List<PistonObject> _pistonObjects, 
             List<RailObject> _railObjects, List<SplineObject> _splineObjects, List<ColorBlockObject> _colorBlockObjects)
         {
             spawnPosition1 = pos1;
             spawnPosition2 = pos2;
+            spawnPosition3 = pos3;
+            spawnPosition4 = pos4;
+
             defaultObjects = _defaultObjects;
             waterObjects = _waterObjects;
             meshSliceObjects = _meshSliceObjects;
