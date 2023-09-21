@@ -76,7 +76,7 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
 		static bool StopNullReference()
         {
-			if (EditorManager.inEditor)
+			if (EditorManager.InEditor)
             {
 				return false;
             }
@@ -317,7 +317,7 @@ namespace SBM_CustomLevels
 			return !EditorManager.InEditor;
         }
 
-		[HarmonyPatch(typeof(SBM.Objects.GameModes.Story.GameManagerStory), "Awake")]
+		/*[HarmonyPatch(typeof(SBM.Objects.GameModes.Story.GameManagerStory), "Awake")]
         [HarmonyTranspiler]
 		static IEnumerable<CodeInstruction> FixEditorGameManager(IEnumerable<CodeInstruction> instructions, ILGenerator il)
 		{
@@ -339,7 +339,7 @@ namespace SBM_CustomLevels
 			var insertInstructions = new List<CodeInstruction>();
 
 			insertInstructions.Add(new CodeInstruction(OpCodes.Ldarg_0));
-			insertInstructions.Add(new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(EditorManager), nameof(EditorManager.inEditor)))); // load inEditor
+			insertInstructions.Add(new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(EditorManager), nameof(EditorManager.InEditor)))); // load inEditor
 			insertInstructions.Add(new CodeInstruction(OpCodes.Brfalse_S, callFindCarrotLabel)); // check if inEditor is false, if false jump to label (skip ret)
 			insertInstructions.Add(new CodeInstruction(OpCodes.Ret)); // if true return, avoid checking for a carrot that might not exist
 
@@ -349,7 +349,7 @@ namespace SBM_CustomLevels
 			}
 
 			return codes;
-		}
+		}*/
 
 		// if inLevel or inEditor, stop original method. if in neither, pass through.
 		[HarmonyPatch(typeof(SBM.Shared.Save.StorySaveData), "GetTimeRecord")]
@@ -383,6 +383,56 @@ namespace SBM_CustomLevels
 		static bool FixBasketball()
         {
 			return !EditorManager.InEditor;
+        }
+
+		// game uses GameObject.Find to find Carrot object, if it doesn't exist then error is thrown and UI stops functioning.
+		// (prevents this carrot check from occuring while inside the editor)
+		[HarmonyPatch(typeof(SBM.Objects.GameModes.Story.GameManagerStory), "Awake")]
+        [HarmonyPrefix]
+		static bool FixCarrotCheck(SBM.Objects.GameModes.Story.GameManagerStory __instance)
+        {
+			if (!EditorManager.InEditor)
+            {
+				return true;
+            }
+
+			if (SBM.Shared.GameManager.Instance != null)
+			{
+				Object.Destroy(__instance);
+				return false;
+			}
+
+			SBM.Shared.GameManager.Instance = __instance;
+			SBM.Shared.GameManager.Exists = true;
+			SBM.Shared.GameMode.Current = __instance.GameModeType;
+			__instance.timer = new SBM.Shared.Utilities.Timer();
+			__instance.scheduledRespawns = new SBM.Shared.Utilities.ExpirableList<SBM.Shared.Player>();
+			__instance.scheduledDespawns = new SBM.Shared.Utilities.ExpirableList<SBM.Shared.Player>();
+			__instance.remainingPlayers = new List<SBM.Shared.Player>();
+			__instance.spawnPoints = new List<Vector3>();
+			__instance.InitializePlayerLives();
+			int defaultScore = __instance.config.DefaultScore;
+			__instance.scoreRedTeam = defaultScore;
+			__instance.scoreBlueTeam = defaultScore;
+			SBM.Shared.Player.OnFirstInput += __instance.OnPlayerFirstInput;
+			SBM.Shared.Player.OnRespawn += __instance.OnPlayerRespawned;
+			SBM.Shared.Player.OnDeath += __instance.OnPlayerDeath;
+			__instance.scheduledRespawns.OnExpired += __instance.OnScheduledRespawn;
+			__instance.scheduledDespawns.OnExpired += __instance.OnScheduledDespawn;
+			__instance.Timer.OnTimerStopped += delegate ()
+			{
+				if (__instance.config.EndRoundAtTimerZero && __instance.roundState == SBM.Shared.RoundState.Started && __instance.timer.Type == SBM.Shared.Utilities.TimerCount.Down)
+				{
+					__instance.EndRound(-1f);
+				}
+			};
+			SBM.Shared.PlayerRoster.OnRosterEvent += __instance.OnPlayerRosterEvent;
+			SBM.Shared.Player.RegenerateAll();
+			SBM.Shared.Cameras.TrackingCamera.ScheduleCenterOnTargets();
+			__instance.pausingEnabled = true;
+
+			SBM.Shared.Player.OnSuckedIntoWormhole += __instance.OnPlayerSuckedIntoWormhole;
+			return false;
         }
 
 		// dont unlock badges for custom levels (which don't have normal badges) /// NullReferenceException
@@ -450,13 +500,13 @@ namespace SBM_CustomLevels
 
                         for (int i = 0; i < LevelManager.instance.currentWorld.levels.Count; i++)
                         {
-							if (LevelManager.instance.currentWorld.levels[i] == nextLevel)
+							if (LevelManager.instance.currentWorld.levels[i].levelPath == nextLevel)
                             {
 								levelNumber = i;
                             }
                         }
 
-						MultiplayerManager.SendCustomLevelData(LevelManager.instance.currentWorld.WorldHash, levelNumber);
+						MultiplayerManager.SendCustomLevelData(LevelManager.instance.currentWorld.WorldHash, levelNumber, LevelManager.LevelType.Story);
 					}
                     catch
                     {
@@ -466,7 +516,7 @@ namespace SBM_CustomLevels
                 else // if no next level, return to menu
                 {
 					SceneSystem.LoadScene("Menu");
-					MultiplayerManager.SendCustomLevelData(LevelManager.instance.currentWorld.WorldHash, ushort.MaxValue);
+					MultiplayerManager.SendCustomLevelData(LevelManager.instance.currentWorld.WorldHash, ushort.MaxValue, LevelManager.LevelType.Story);
 				}
 				
 				return false;
