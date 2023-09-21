@@ -31,6 +31,8 @@ namespace SBM_CustomLevels
 
         private GameObject customWorldSelector;
         private GameObject customLevelSelector;
+        private GameObject customPartyLevelSelect;
+        private Level selectedPartyLevel;
         //private GameObject addToWorldUI;
         //private Text addToWorldText;
 
@@ -135,7 +137,11 @@ namespace SBM_CustomLevels
 
                 worldObject.GetComponentInChildren<Text>().text = world.Name;
 
-                if (world.levels.Count == 0)
+                if (world.Name == "Basketball" || world.Name == "Deathmatch" || world.Name == "Carrot Grab")
+                {
+                    worldObject.GetComponentInChildren<UI.Components.RawImageUVScroll>().gameObject.GetComponent<RawImage>().color = new Color32(255, 126, 0, 255); // orange
+                }
+                else if (world.levels.Count == 0)
                 {
                     worldObject.GetComponentInChildren<UI.Components.RawImageUVScroll>().gameObject.GetComponent<RawImage>().color = new Color32(255, 10, 0, 255); // red
                 }
@@ -168,11 +174,11 @@ namespace SBM_CustomLevels
 
                     foreach (UIFocusable level in customLevels.group)
                     {
-                        level.gameObject.SetActive(false); //disable all previously activated level gameobjects
+                        level.gameObject.SetActive(false); // disable all previously activated level gameobjects
                     }
 
                     int count2 = 0;
-                    foreach (string level in world.levels) //create level selection ui
+                    foreach (Level level in world.levels) // create level selection ui
                     {
                         if (count2 >= LevelLoader_Mod.maxLevels)
                         {
@@ -187,16 +193,16 @@ namespace SBM_CustomLevels
                         levelObject.GetComponent<UIFocusable>().onSubmitSuccess.RemoveAllListeners();
                         levelObject.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
                         {
-                            EditorManager.instance.selectedLevel = level;
+                            EditorManager.instance.selectedLevel = level.levelPath;
                             EditorManager.InEditor = true;
 
-                            if (File.ReadAllBytes(level).Length != 0)
+                            if (File.ReadAllBytes(level.levelPath).Length != 0)
                             {
-                                LevelManager.instance.BeginLoadLevel(true, false, level, 0, LevelManager.LevelType.Editor); // if level is not empty, load as existing level
+                                LevelManager.instance.BeginLoadLevel(true, false, level.levelPath, 0, LevelManager.LevelType.Editor); // if level is not empty, load as existing level
                             }
                             else
                             {
-                                LevelManager.instance.BeginLoadLevel(true, true, level, 0, LevelManager.LevelType.Editor); // if level is empty, load as new level (create carrot, prefabs, etc.)
+                                LevelManager.instance.BeginLoadLevel(true, true, level.levelPath, 0, LevelManager.LevelType.Editor); // if level is empty, load as new level (create carrot, prefabs, etc.)
                             }
                         });
 
@@ -219,7 +225,7 @@ namespace SBM_CustomLevels
             }
 
             int count = 0;
-            foreach (string level in selectedWorld.levels) //create level selection ui
+            foreach (Level level in selectedWorld.levels) //create level selection ui
             {
                 print("TEST!");
 
@@ -236,16 +242,16 @@ namespace SBM_CustomLevels
                 levelObject.GetComponent<UIFocusable>().onSubmitSuccess.RemoveAllListeners();
                 levelObject.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
                 {
-                    EditorManager.instance.selectedLevel = level;
+                    EditorManager.instance.selectedLevel = level.levelPath;
                     EditorManager.InEditor = true;
 
-                    if (File.ReadAllBytes(level).Length != 0)
+                    if (File.ReadAllBytes(level.levelPath).Length != 0)
                     {
-                        LevelManager.instance.BeginLoadLevel(true, false, level, 0, LevelManager.LevelType.Editor); // if level is not empty, load as existing level
+                        LevelManager.instance.BeginLoadLevel(true, false, level.levelPath, 0, LevelManager.LevelType.Editor); // if level is not empty, load as existing level
                     }
                     else
                     {
-                        LevelManager.instance.BeginLoadLevel(true, true, level, 0, LevelManager.LevelType.Editor); // if level is empty, load as new level (create carrot, prefabs, etc.)
+                        LevelManager.instance.BeginLoadLevel(true, true, level.levelPath, 0, LevelManager.LevelType.Editor); // if level is empty, load as new level (create carrot, prefabs, etc.)
                     }
                 });
 
@@ -259,6 +265,11 @@ namespace SBM_CustomLevels
         {;
             //worldCount + 6, initially there are 5 worlds
             //worldCount + 5, world 1 is set at position 0
+
+            if (world.Name == "Deathmatch" || world.Name == "Basketball" || world.Name == "Carrot Grab")
+            {
+                return;
+            }
 
             GameObject worldModel = Instantiate(FindInactiveGameObject("WorldModel_1"), FindInactiveGameObject("transform").transform); //create a copy of world 1's world model for custom world
             worldModel.transform.localPosition = new Vector3(5 * (worldCount + 5), 0, 0); //set to proper position (5 to the right of world 5)
@@ -305,7 +316,7 @@ namespace SBM_CustomLevels
             }
             
             //make world selecting arrows properly animate/color with custom worlds
-            UI.Utilities.Focus.UIFocusableColorShift.Condition newCondition = new UI.Utilities.Focus.UIFocusableColorShift.Condition();
+            /*UI.Utilities.Focus.UIFocusableColorShift.Condition newCondition = new UI.Utilities.Focus.UIFocusableColorShift.Condition();
             newCondition.Focusable = worldUI;
             newCondition.AnimateWhen = UI.Utilities.Focus.UIFocusableConditionHandler.ConditionType.NotFocused;
             
@@ -313,7 +324,7 @@ namespace SBM_CustomLevels
             //arrowLeft.conditions = arrowLeft.conditions.Append(newCondition).ToArray();
 
             //UI.Utilities.Focus.UIFocusableColorShift arrowRight = FindInactiveGameObject<UI.Utilities.Focus.UIFocusableColorShift>("Arrow_Right");
-            //arrowRight.conditions = arrowRight.conditions.Append(newCondition).ToArray();
+            //arrowRight.conditions = arrowRight.conditions.Append(newCondition).ToArray();*/
             
             UITransitionerCarousel worldNamesTransitioner = FindInactiveGameObject<UITransitionerCarousel>("World Names");
             GameObject worldName_1 = FindInactiveGameObject<UI.Components.UI_SBMTheme_Text>("Text_WorldTitle_1").gameObject;
@@ -338,20 +349,31 @@ namespace SBM_CustomLevels
             //string[] levels = Directory.GetFiles(worldPath);
             string levelName = "";
 
-            for (int i = 0; i < world.levels.Count + 1; i++)
+            if (world.Name == "Deathmatch" || world.Name == "Basketball" || world.Name == "Carrot Grab")
             {
-                if (i >= 10)
+                // create random 18 digit identifier for party levels, allowing individual levels to be synced across network based on identifier
+                var random = new System.Random();
+                for (int i = 0; i < 18; i++) //  hash length max 18
+                    levelName = String.Concat(levelName, random.Next(10).ToString());
+                levelName += ".sbm";
+            }
+            else
+            {
+                for (int i = 0; i < world.levels.Count + 1; i++)
                 {
-                    return;
-                }
+                    if (i >= 10)
+                    {
+                        return;
+                    }
 
-                if (!File.Exists(Path.Combine(world.worldPath, (i + 1).ToString() + ".sbm")))
-                {
-                    levelName = (i + 1).ToString() + ".sbm";
+                    if (!File.Exists(Path.Combine(world.worldPath, (i + 1).ToString() + ".sbm")))
+                    {
+                        levelName = (i + 1).ToString() + ".sbm";
 
-                    Debug.Log("Success! Level created at: " + levelName);
+                        Debug.Log("Success! Level created at: " + levelName);
 
-                    break;
+                        break;
+                    }
                 }
             }
 
@@ -543,9 +565,161 @@ namespace SBM_CustomLevels
             }
             
             instance.levelEditorButton = editorFocusable;
-            
+
             uiBundle.Unload(false);
             instance.CreateMenuUI();
+        }
+
+        [HarmonyPatch(typeof(UI.MainMenu.PartyMode.UIPartyModeLevels), "Awake")]
+        [HarmonyPostfix]
+        static void UpdatePartyLevelUI()
+        {
+            AssetBundle uiBundle = LevelLoader_Mod.GetAssetBundleFromResources("ui-bundle");
+
+            // create party level select UI
+            Image panelLevelSelect = FindInactiveGameObject<Image>("Panel_LevelSelect");
+            panelLevelSelect.rectTransform.sizeDelta = new Vector2(panelLevelSelect.rectTransform.sizeDelta.x + 120, panelLevelSelect.rectTransform.sizeDelta.y);
+            UIFocusableGroup partyLevelButtons = panelLevelSelect.transform.Find("LevelButtons").GetComponent<UIFocusableGroup>();
+            UIFocusable customButton = Instantiate(partyLevelButtons.group.Last(), partyLevelButtons.group.Last().transform.parent);
+            customButton.GetComponentInChildren<RawImage>().texture = uiBundle.LoadAsset<Texture>("ui_customlevel");
+
+            // set navtargets for UI traversal
+            customButton.navTargetLeft = partyLevelButtons.group[partyLevelButtons.group.Length - 1];
+            partyLevelButtons.group[partyLevelButtons.group.Length - 1].navTargetRight = customButton;
+            partyLevelButtons.group = partyLevelButtons.group.Append(customButton).ToArray();
+
+            instance.customPartyLevelSelect = Instantiate(uiBundle.LoadAsset<GameObject>("CustomPartySelect"), panelLevelSelect.transform.parent);
+
+            instance.customPartyLevelSelect.GetComponent<UIFocusable>().onCancel.AddListener(delegate
+            {
+                panelLevelSelect.gameObject.GetComponent<UITransitioner>().Transition_In_From_Left();
+            });
+
+            // change button event to open custom level select
+            customButton.onSubmitSuccess = new UnityEngine.Events.UnityEvent();
+            customButton.onSubmitSuccess.AddListener(delegate
+            {
+                panelLevelSelect.gameObject.GetComponent<UITransitioner>().Transition_Out_To_Left();
+                instance.customPartyLevelSelect.GetComponent<UITransitioner>().Transition_In_From_Right();
+            });
+
+            UIFocusableGroup gameModeButtons = panelLevelSelect.transform.parent.Find("Panel_GameModeSelect/Buttons").GetComponent<UIFocusableGroup>();
+
+            // Deathmatch
+            gameModeButtons.group[0].onSubmitSuccess.AddListener(delegate
+            {
+                instance.UpdateCustomPartyLevels(LevelManager.LevelType.Deathmatch);
+            });
+
+            // Basketball
+            gameModeButtons.group[1].onSubmitSuccess.AddListener(delegate
+            {
+                instance.UpdateCustomPartyLevels(LevelManager.LevelType.Basketball);
+            });
+
+            // Carrot Grab
+            gameModeButtons.group[2].onSubmitSuccess.AddListener(delegate
+            {
+                instance.UpdateCustomPartyLevels(LevelManager.LevelType.CarrotGrab);
+            });
+
+            uiBundle.Unload(false);
+
+            // update initially so UI is correct, deathmatch is default party mode
+            instance.UpdateCustomPartyLevels(LevelManager.LevelType.Deathmatch);
+            instance.customPartyLevelSelect.SetActive(false);
+        }
+
+        // custom level index (+5) exists beyond the bounds of the array, and LevelIsLocked tries to access an index outside of the array
+        [HarmonyPatch(typeof(UI.MainMenu.PartyMode.PartyModeData), "LevelIsLocked")]
+        [HarmonyPrefix]
+        static bool PreventCustomLevelLocked(bool __result, int levelIndex)
+        {
+            // if custom level
+            if (levelIndex >= 5)
+            {
+                __result = false;
+                return false;
+            }
+
+            return true;
+        }
+
+        private void UpdateCustomPartyLevels(LevelManager.LevelType levelType)
+        {
+            List<Level> levels = new List<Level>();
+
+            //TODO: FIX PARTY LEVEL IS LOCKED
+            if (levelType == LevelManager.LevelType.Deathmatch)
+            {
+                foreach (World world in LevelLoader_Mod.worldsList)
+                {
+                    if (world.Name == "Deathmatch")
+                    {
+                        levels = world.levels;
+                    }
+                }
+            }
+            else if (levelType == LevelManager.LevelType.Basketball)
+            {
+                foreach (World world in LevelLoader_Mod.worldsList)
+                {
+                    if (world.Name == "Basketball")
+                    {
+                        levels = world.levels;
+                    }
+                }
+            }
+            else if (levelType == LevelManager.LevelType.CarrotGrab)
+            {
+                foreach (World world in LevelLoader_Mod.worldsList)
+                {
+                    if (world.Name == "Carrot Grab")
+                    {
+                        levels = world.levels;
+                    }
+                }
+            }
+
+            // set level buttons active
+            int levelCount = levels.Count;
+            UIFocusableGroup levelButtonGroup = instance.customPartyLevelSelect.transform.Find("LevelContainer").GetComponent<UIFocusableGroup>();
+
+            UITransitioner panelSetup = instance.customPartyLevelSelect.transform.parent.Find("Panel_Setup").GetComponent<UITransitioner>();
+
+            for (int i = 0; i < levelCount; i++)
+            {
+                if (i == 10)
+                {
+                    break;
+                }
+
+                levelButtonGroup.group[i].gameObject.SetActive(true);
+
+                int index = i;
+
+                levelButtonGroup.group[i].onSubmitSuccess = new UnityEngine.Events.UnityEvent();
+                levelButtonGroup.group[i].onSubmitSuccess.AddListener(delegate
+                {
+                    instance.customPartyLevelSelect.GetComponent<UITransitioner>().Transition_Out_To_Right();
+                    panelSetup.Transition_In_From_Left();
+                    FindObjectOfType<UI.MainMenu.PartyMode.UIPartyModeLevels>().selectedLevelIndex = 5;
+                    selectedPartyLevel = levels[index];
+                });
+            }
+
+            for (int i = 0; i < levelButtonGroup.group.Length; i++)
+            {
+                if (i >= levelCount)
+                {
+                    levelButtonGroup.group[i].gameObject.SetActive(false);
+                }
+            }
+
+            if (levelCount == 0)
+            {
+                levelButtonGroup.group[0].gameObject.SetActive(true);
+            }
         }
 
         [HarmonyPatch(typeof(UI.MainMenu.StoryMode.UIStoryWorldModels), "Awake")]
@@ -607,7 +781,7 @@ namespace SBM_CustomLevels
                     levelButton.SetLevelNumber(i + 1);
 
                     CustomLevelID levelID = levelButton.GetComponent<CustomLevelID>();
-                    levelID.ID = LevelLoader_Mod.worldsList[index - 5].levels[i];
+                    levelID.ID = LevelLoader_Mod.worldsList[index - 5].levels[i].levelPath;
                     levelID.world = LevelLoader_Mod.worldsList[index - 5];
                     levelID.GetComponent<CustomLevelID>().levelNumber = i+1;
 
@@ -643,6 +817,7 @@ namespace SBM_CustomLevels
             return true;
         }
 
+        //TODO: add version for Party Levels multiplayer
         [HarmonyPatch(typeof(UI.MainMenu.StoryMode.UIStoryLevelButtons), "OnLevelButtonSubmit")]
         [HarmonyPrefix]
         static bool OverrideLevelSelect(UI.MainMenu.StoryMode.UIStoryLevelButton b)
@@ -654,12 +829,13 @@ namespace SBM_CustomLevels
                 {
                     return false;
                 }
+
                 try
                 {
                     if (SBM.Shared.Networking.NetworkSystem.IsInSession)
                     {
                         // send world identifier to all other players when in network. levelID.levelNumber - 1, since levelID.levelNumber starts at 1 rather than 0.
-                        MultiplayerManager.SendCustomLevelData(levelID.world.WorldHash, levelID.levelNumber - 1);
+                        MultiplayerManager.SendCustomLevelData(levelID.world.WorldHash, levelID.levelNumber - 1, LevelManager.LevelType.Story);
                         LevelManager.instance.BeginLoadLevel(false, false, levelID.ID, levelID.levelNumber, LevelManager.LevelType.Story, levelID.world);
                     }
                     else
@@ -680,7 +856,7 @@ namespace SBM_CustomLevels
 
         [HarmonyPatch(typeof(SBM.UI.MainMenu.PartyMode.UIPartyModeLevels), "TransitionOutToLevel")]
         [HarmonyPrefix]
-        static bool OverridePartyLevelSelect(SBM.UI.MainMenu.PartyMode.UIPartyModeLevels __instance)
+        static bool OverridePartyLevelSelect(UI.MainMenu.PartyMode.UIPartyModeLevels __instance)
         {
             if (__instance.screenFader.IsFading)
             {
@@ -688,8 +864,7 @@ namespace SBM_CustomLevels
             }
 
             // if custom level
-            //if (__instance.selectedLevelIndex >= 5)
-            if (true)
+            if (__instance.selectedLevelIndex >= 5)
             {
                 if (SBM.Shared.Networking.NetworkSystem.IsInSession && SBM.Shared.Networking.NetworkSystem.IsHost && SBM.Shared.Networking.NetworkSystem.RemoteUserCount <= 0)
                 {
@@ -715,10 +890,25 @@ namespace SBM_CustomLevels
                         break;
                 }
 
-                __instance.screenFader.FadeOut();
-                // debug
-                LevelManager.instance.BeginLoadLevel(false, false, @"C:\Program Files (x86)\Steam\steamapps\common\Super Bunny Man\testbasketball\1.sbm", 0, levelType);
-                __instance.onTransitionOutToLevel.Invoke();
+                //TODO: add list of party levels, can be renamed to differentiate
+                try
+                {
+                    
+                    if (SBM.Shared.Networking.NetworkSystem.IsInSession)
+                    {
+                        MultiplayerManager.SendCustomLevelData(instance.selectedPartyLevel.levelHash, 0, levelType);
+                    }
+
+                    __instance.onTransitionOutToLevel.Invoke();
+                    LevelManager.instance.BeginLoadLevel(false, false, instance.selectedPartyLevel.levelPath, 0, levelType);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError(ex);
+                    instance.customPartyLevelSelect.GetComponent<UIFocusable>().onCancel.Invoke();
+                }
+                
+                
 
                 return false;
             }
