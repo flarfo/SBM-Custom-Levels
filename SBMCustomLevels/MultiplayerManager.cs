@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Catobyte.Networking;
@@ -57,6 +58,25 @@ namespace SBM_CustomLevels
             }
         }
 
+        private static string GetLevelByHash(string worldName, ulong levelHash)
+        {
+            foreach (World world in LevelLoader_Mod.worldsList)
+            {
+                if (world.Name == worldName)
+                {
+                    foreach (Level level in world.levels)
+                    {
+                        if (level.levelHash == levelHash)
+                        {
+                            return level.levelPath;
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
         private static void OnReceivedCustomLevelData(NetworkUserId id, TickNumber tickNumber, NetworkData data)
         {
             if (NetworkSystem.instance == null)
@@ -72,6 +92,9 @@ namespace SBM_CustomLevels
 
                 Debug.Log("CUSTOM WORLD: " + sceneData.world);
                 Debug.Log("CUSTOM LEVEL: " + sceneData.level);
+                Debug.Log("LEVEL TYPE: " + (LevelManager.LevelType)sceneData.levelType);
+
+                LevelManager.LevelType levelType = (LevelManager.LevelType)sceneData.levelType;
 
                 // escape condition if nonexistant level loads or other fault in transmitting level
                 if (sceneData.level == ushort.MaxValue)
@@ -83,39 +106,93 @@ namespace SBM_CustomLevels
                     }
                 }
 
-                World receivedWorld = null;
+                string receivedLevel = "";
 
-                foreach (World world in LevelLoader_Mod.worldsList)
+                // if level type is party, determine and send level based on level itself, not world
+                if (levelType == LevelManager.LevelType.Deathmatch)
                 {
-                    if (world.WorldHash == sceneData.world)
+                    if (!Directory.Exists(LevelLoader_Mod.deathmatchPath)) 
                     {
-                        receivedWorld = world;
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("World not found! Potential mismatch between client and server?");
+                        return;
                     }
+
+                    receivedLevel = GetLevelByHash("Deathmatch", sceneData.world);
                 }
-
-                if (receivedWorld == null)
+                else if (levelType == LevelManager.LevelType.Basketball)
                 {
-                    if (LevelManager.InLevel)
+                    if (!Directory.Exists(LevelLoader_Mod.basketballPath))
                     {
-                        SBM.Shared.SceneSystem.LoadScene("Menu");
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("World not found! Potential mismatch between client and server?");
+                        return;
                     }
 
-                    Debug.Log("World not found! Potential mismatch between client and server?");
+                    receivedLevel = GetLevelByHash("Basketball", sceneData.world);
+                }
+                else if (levelType == LevelManager.LevelType.CarrotGrab)
+                {
+                    if (!Directory.Exists(LevelLoader_Mod.carrotGrabPath))
+                    {
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("World not found! Potential mismatch between client and server?");
+                        return;
+                    }
+
+                    receivedLevel = GetLevelByHash("Carrot Grab", sceneData.world);
+                }
+                else // if not party level type, determine id of level based on index in the sent world
+                {
+                    World receivedWorld = null;
+
+                    foreach (World world in LevelLoader_Mod.worldsList)
+                    {
+                        if (world.WorldHash == sceneData.world)
+                        {
+                            receivedWorld = world;
+                        }
+                    }
+
+                    if (receivedWorld == null)
+                    {
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("World not found! Potential mismatch between client and server?");
+                        return;
+                    }
+                    else if (sceneData.level > receivedWorld.levels.Count - 1)
+                    {
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("Level not found! Potential mismatch between client and server?");
+                        return;
+                    }
+
+                    LevelManager.instance.BeginLoadLevel(false, false, receivedWorld.levels[sceneData.level].levelPath, sceneData.level + 1, levelType, receivedWorld); // add isNetworkClient ?
                     return;
                 }
-                else if (sceneData.level > receivedWorld.levels.Count - 1)
-                {
-                    if (LevelManager.InLevel)
-                    {
-                        SBM.Shared.SceneSystem.LoadScene("Menu");
-                    }
 
-                    Debug.Log("Level not found! Potential mismatch between client and server?");
-                    return;
-                }
-
-                LevelManager.instance.BeginLoadLevel(false, false, receivedWorld.levels[sceneData.level], sceneData.level + 1, LevelManager.LevelType.Story, receivedWorld); // add isNetworkClient ? 
-                // send callback confirming load, THEN activate network ?
+                // if level type is party, determine and send level based on level itself, not world
+                LevelManager.instance.BeginLoadLevel(false, false, receivedLevel, sceneData.level + 1, levelType);
             }
         }
 
@@ -129,7 +206,7 @@ namespace SBM_CustomLevels
         // NetworkSystem.SceneIsSyncedWithRemoteUsers is FALSE! GameManager yields null until this is TRUE!
 
         // if (custom level to be loaded)
-        public static void SendCustomLevelData(ulong world, int level)
+        public static void SendCustomLevelData(ulong world, int level, LevelManager.LevelType levelType)
         {
             if (!Network.Session.Exists)
             {
@@ -139,6 +216,7 @@ namespace SBM_CustomLevels
             CustomSceneData sceneData = new CustomSceneData();
             sceneData.world = world;
             sceneData.level = (ushort)level;
+            sceneData.levelType = (ushort)levelType;
 
             Network.Session.SendToAll(CustomChannel, sceneData);
         }
@@ -656,17 +734,21 @@ namespace SBM_CustomLevels
             public ulong world;
             // integer identifier of level within a world 0-9 for the 10 levels (max) that exist in a world
             public ushort level;
+            // integer identifier for type of level (using enum LevelManager.LevelType)
+            public ushort levelType;
 
             public override void Serialize(ISerializer ser)
             {
                 ser.Write(world);
                 ser.Write(level);
+                ser.Write(levelType);
             }
 
             public override void Deserialize(IDeserializer deser)
             {
                 this.world = deser.Read<ulong>();
                 this.level = deser.Read<ushort>();
+                this.levelType = deser.Read<ushort>();
             }
         }
     }
