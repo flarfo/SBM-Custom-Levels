@@ -31,7 +31,55 @@ namespace SBM_CustomLevels
 
         public GameObject background;
 
-        public static bool inEditor = false;
+        private static bool inEditor = false;
+        private bool testing = false;
+
+        public bool Testing 
+        {
+            get
+            {
+                return testing;
+            }
+            set
+            {
+                testing = value;
+
+                Physics.autoSimulation = value;
+
+                if (value)
+                {
+                    // spawn player
+                    if (SBM.Shared.PlayerRoster.profiles.Count < 1)
+                    {
+                        SBM.Shared.PlayerRoster.RegisterLocalPlayer(1, 0);
+                    }
+                    
+                    SBM.Shared.Player.RegenerateAll();
+                    SBM.Shared.Cameras.TrackingCamera.ScheduleCenterOnTargets();
+                }
+                else
+                {
+                    // destroy player
+                    if (EditorManager.InEditor)
+                    {
+                        var byNumber = SBM.Shared.Player.GetByNumber(1).gameObject;
+
+                        if (byNumber)
+                        {
+                            Destroy(byNumber);
+                        }
+                    }
+                }
+
+                if (EditorManager.InEditor)
+                {
+                    SBM.Shared.WorldResetHandler.ScanForResettables();
+                    SBM.Shared.GameManager.Instance.ResetRound(false, 0f);
+                }
+            }
+        }
+
+        public bool testingPaused = false;
 
         public string selectedLevel;
 
@@ -61,8 +109,7 @@ namespace SBM_CustomLevels
         public GameObject carrot;
 
         public GameObject wormhole;
-        public GameObject spawn1;
-        public GameObject spawn2;
+        public GameObject[] spawns = new GameObject[4];
 
         public static bool InEditor 
         {
@@ -103,42 +150,11 @@ namespace SBM_CustomLevels
 
         private void Update()
         {
-            // debug
-            /*if (Input.GetKeyDown(KeyCode.PageDown))
-            {
-                if (!SBM.Shared.Networking.NetworkSystem.IsInSession)
-                {
-                    return;
-                }
-
-                if (SBM.Shared.Networking.NetworkSystem.IsHost)
-                {
-                    SBM.Shared.Networking.NetworkSystem.InviteViaServiceOverlay();
-
-                    if (MultiplayerManager.playerCount > 1)
-                    {
-                        // SBM.Shared.Networking.NetworkSystem.InviteViaServiceOverlay();
-                    }
-                }
-            }
-            
-            // debug
-            if (Input.GetKeyDown(KeyCode.PageUp))
-            {
-                foreach (var player in SBM.Shared.PlayerRoster.profiles)
-                {
-                    Debug.Log($"{player.BaseUsername} {player.PlayerNumber}: Device {player.InputDeviceIndex}");
-                }
-
-                Debug.Log("Player Count: " + MultiplayerManager.playerCount);
-            }
-            // end*/
-
-            if (!inEditor || !editorUI)
+            if (!InEditor || !editorUI)
             {
                 return;
             }
-            
+
             bool ctrlClicked = false;
 
             if (Input.GetKey(KeyCode.LeftControl))
@@ -723,9 +739,10 @@ namespace SBM_CustomLevels
         {
             Debug.Log("Editor reset!");
             InEditor = false;
+            Testing = false;
+            testingPaused = false;
             wormhole = null;
-            spawn1 = null;
-            spawn2 = null;
+            spawns = new GameObject[4];
             selectedLevel = null;
             curSelected = new List<EditorSelectable>();
             selectableObjects = new List<EditorSelectable>();
@@ -766,6 +783,8 @@ namespace SBM_CustomLevels
 
             Vector3 spawnPos_1;
             Vector3 spawnPos_2;
+            Vector3 spawnPos_3;
+            Vector3 spawnPos_4;
 
             try
             {
@@ -786,7 +805,26 @@ namespace SBM_CustomLevels
                 Debug.LogError("Missing spawnPos_2 in json! Setting to (1,0,0).");
                 spawnPos_2 = new Vector3(1, 0, 0);
             }
-            
+
+            try
+            {
+                spawnPos_3 = json.spawnPosition3.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_3 in json! Setting to NULL.");
+                spawnPos_3 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
+
+            try
+            {
+                spawnPos_4 = json.spawnPosition4.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_4 in json! Setting to NULL.");
+                spawnPos_4 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
 
             try
             {
@@ -805,7 +843,15 @@ namespace SBM_CustomLevels
                         loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
 
                         Material mat = new Material(Shader.Find("Standard"));
-                        mat.color = Color.red;
+                        mat.color = new Color32(255, 0, 0, 128);
+
+                        // for transparency
+                        mat.SetFloat("_Mode", 3);
+                        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        mat.EnableKeyword("_ALPHABLEND_ON");
+                        mat.renderQueue = 3000;
+
                         loadedObject.AddComponent<MeshRenderer>().material = mat;
                     }
                     else if (defaultObject.objectName == "prefabs\\level\\world3\\BoulderDestroyer")
@@ -813,7 +859,15 @@ namespace SBM_CustomLevels
                         loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
 
                         Material mat = new Material(Shader.Find("Standard"));
-                        mat.color = new Color(0.5f, 0, 0);
+                        mat.color = new Color32(128, 0, 0, 128);
+
+                        // for transparency
+                        mat.SetFloat("_Mode", 3);
+                        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        mat.EnableKeyword("_ALPHABLEND_ON");
+                        mat.renderQueue = 3000;
+
                         loadedObject.AddComponent<MeshRenderer>().material = mat;
                     }
                     else if (defaultObject.objectName == "ScaffoldingBlock")
@@ -1100,7 +1154,7 @@ namespace SBM_CustomLevels
             playerSpawn_1.AddComponent<SBM.Shared.PlayerSpawnPoint>();
             playerSpawn_1.AddComponent<Outline>();
             playerSpawn_1.AddComponent<EditorSelectable>();
-            instance.spawn1 = playerSpawn_1;
+            instance.spawns[0] = playerSpawn_1;
 
             GameObject playerSpawn_2 = Instantiate(playerSpawn);
             playerSpawn_2.name = "PlayerSpawn_2";
@@ -1109,7 +1163,31 @@ namespace SBM_CustomLevels
             playerSpawn_2.AddComponent<SBM.Shared.PlayerSpawnPoint>();
             playerSpawn_2.AddComponent<Outline>();
             playerSpawn_2.AddComponent<EditorSelectable>();
-            instance.spawn2 = playerSpawn_2;
+            instance.spawns[1] = playerSpawn_2;
+
+            if (spawnPos_3 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_3 = Instantiate(playerSpawn);
+                playerSpawn_3.name = "PlayerSpawn_3";
+                playerSpawn_3.transform.position = spawnPos_3;
+                playerSpawn_3.transform.localScale = new Vector3(1, 2, 1);
+                playerSpawn_3.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+                playerSpawn_3.AddComponent<Outline>();
+                playerSpawn_3.AddComponent<EditorSelectable>();
+                instance.spawns[2] = playerSpawn_3;
+            }
+
+            if (spawnPos_4 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_4 = Instantiate(playerSpawn);
+                playerSpawn_4.name = "PlayerSpawn_4";
+                playerSpawn_4.transform.position = spawnPos_4;
+                playerSpawn_4.transform.localScale = new Vector3(1, 2, 1);
+                playerSpawn_4.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+                playerSpawn_4.AddComponent<Outline>();
+                playerSpawn_4.AddComponent<EditorSelectable>();
+                instance.spawns[3] = playerSpawn_4;
+            }
         }
 
         //creates a new base level in editor mode
@@ -1127,7 +1205,7 @@ namespace SBM_CustomLevels
             playerSpawn_1.AddComponent<SBM.Shared.PlayerSpawnPoint>();
             playerSpawn_1.AddComponent<Outline>();
             playerSpawn_1.AddComponent<EditorSelectable>();
-            instance.spawn1 = playerSpawn_1;
+            instance.spawns[0] = playerSpawn_1;
 
             GameObject playerSpawn_2 = Instantiate(playerSpawn);
             playerSpawn_2.name = "PlayerSpawn_2";
@@ -1136,7 +1214,7 @@ namespace SBM_CustomLevels
             playerSpawn_2.AddComponent<SBM.Shared.PlayerSpawnPoint>();
             playerSpawn_2.AddComponent<Outline>();
             playerSpawn_2.AddComponent<EditorSelectable>();
-            instance.spawn2 = playerSpawn_2;
+            instance.spawns[1] = playerSpawn_2;
         }
 
         public void InitializeEditor()
