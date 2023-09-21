@@ -145,7 +145,6 @@ namespace SBM_CustomLevels
                         break;
                 }
 
-
                 if (isEditor)
                 {
                     //add camera controller, (camera loaed in LevelPrefab_Story), moved from InitializeEditor as camera didnt exist previously...)
@@ -213,6 +212,8 @@ namespace SBM_CustomLevels
 
             Vector3 spawnPos_1;
             Vector3 spawnPos_2;
+            Vector3 spawnPos_3;
+            Vector3 spawnPos_4;
 
             try
             {
@@ -232,6 +233,26 @@ namespace SBM_CustomLevels
             {
                 Debug.LogError("Missing spawnPos_2 in json! Setting to (1,0,0).");
                 spawnPos_2 = new Vector3(1, 0, 0);
+            }
+
+            try
+            {
+                spawnPos_3 = json.spawnPosition3.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_3 in json! Setting to NULL.");
+                spawnPos_3 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
+
+            try
+            {
+                spawnPos_4 = json.spawnPosition4.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_4 in json! Setting to NULL.");
+                spawnPos_4 = new Vector3(0, 0, -999); // indicate a non-set spawn
             }
 
             try
@@ -508,6 +529,18 @@ namespace SBM_CustomLevels
             GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_2.transform.position = spawnPos_2;
 
+            if (spawnPos_3 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_3 = new GameObject("PlayerSpawn_3", typeof(SBM.Shared.PlayerSpawnPoint));
+                playerSpawn_3.transform.position = spawnPos_3;
+            }
+
+            if (spawnPos_4 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_4 = new GameObject("PlayerSpawn_4", typeof(SBM.Shared.PlayerSpawnPoint));
+                playerSpawn_4.transform.position = spawnPos_4;
+            }
+            
             if (SBM.Shared.Networking.NetworkSystem.IsInSession)
             {
                 // setup all profiles for CO-OP play, modified version of SBM.UI.Components.UIPlayerRoster.ConfigureCoopPlayersForNetworkPlay()
@@ -601,7 +634,7 @@ namespace SBM_CustomLevels
             {
                 SceneSystem.Unload(PreviousSceneName).completed += delegate (AsyncOperation o)
                 {
-                    LoadLevel(isEditor, newLevel, path, levelType);
+                    LoadLevel(isEditor, newLevel, path, LevelManager.LevelType.Editor);
                 };
             }
         }
@@ -612,11 +645,9 @@ namespace SBM_CustomLevels
 
             if (currentLevel != null)
             {
-                List<string> levelPaths = currentWorld.levels;
-
-                if (levelPaths.Count-1 > levelNumber-1) // if next level exists... levelNumber-1 since level number is + 1.
+                if (currentWorld.levels.Count - 1 > levelNumber-1) // if next level exists... levelNumber-1 since level number is + 1.
                 {
-                    nextLevel = levelPaths[levelNumber];
+                    nextLevel = currentWorld.levels[levelNumber].levelPath;
                 }
 
                 levelNumber++;
