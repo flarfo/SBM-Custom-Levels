@@ -100,6 +100,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -163,11 +164,14 @@
     <Compile Include="SBMCustomLevels\Editor\EditorManager.cs" />
     <Compile Include="SBMCustomLevels\Editor\EditorSelectable.cs" />
     <Compile Include="SBMCustomLevels\Editor\EditorUI.cs" />
+    <Compile Include="SBMCustomLevels\Extensions.cs" />
     <Compile Include="SBMCustomLevels\Object Wrappers\ColorBlockObject.cs" />
+    <Compile Include="SBMCustomLevels\Object Wrappers\LegacyJSONObjectContainer.cs" />
+    <Compile Include="SBMCustomLevels\Object Wrappers\SeeSawObject.cs" />
     <Compile Include="SBMCustomLevels\Object Wrappers\SplineObject.cs" />
-    <Compile Include="SBMCustomLevels\Object Wrappers\TubeRendererObject.cs" />
     <Compile Include="SBMCustomLevels\Objects\ColorData.cs" />
     <Compile Include="SBMCustomLevels\Objects\PistonDataContainer.cs" />
+    <Compile Include="SBMCustomLevels\Objects\SeeSawPivotNode.cs" />
     <Compile Include="SBMCustomLevels\Objects\SplineMakerHelper.cs" />
     <Compile Include="SBMCustomLevels\Objects\SplineMakerNodeData.cs" />
     <Compile Include="SBMCustomLevels\Objects\SplineMakerParent.cs" />
@@ -184,10 +188,10 @@
     <Compile Include="SBMCustomLevels\Object Wrappers\DefaultObject.cs" />
     <Compile Include="SBMCustomLevels\LevelManager.cs" />
     <Compile Include="SBMCustomLevels\LevelLoader_Mod.cs" />
-    <Compile Include="SBMCustomLevels\Object Wrappers\ObjectContainer.cs" />
+    <Compile Include="SBMCustomLevels\Object Wrappers\JSONObjectContainer.cs" />
     <Compile Include="SBMCustomLevels\Object Wrappers\RailObject.cs" />
     <Compile Include="SBMCustomLevels\Object Wrappers\WaterObject.cs" />
-    <Compile Include="SBMCustomLevels\Editor\Outline.cs" />
+    <Compile Include="SBMCustomLevels\Outline.cs" />
     <Compile Include="SBMCustomLevels\Patches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SBMCustomLevels\RecordLevel.cs" />
@@ -207,6 +211,9 @@
     <None Include="BundleMac\scene-bundle" />
     <None Include="BundleMac\ui-bundle" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Connected Services\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
