@@ -1,11 +1,13 @@
-﻿using System;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
+using System;
+using System.Runtime.Serialization;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
-using Object = UnityEngine.Object;
+using SBM_CustomLevels.ObjectWrappers;
+using SBM_CustomLevels.Editor;
 
 namespace SBM_CustomLevels
 {
@@ -73,32 +75,41 @@ namespace SBM_CustomLevels
             }
 
             //TODO: add try/catch to prevent saving with errors
-            WriteJSON(FindObjectsOfType(typeof(EditorSelectable)) as EditorSelectable[]);
+            var objects = FindObjectsOfType(typeof(EditorSelectable)).Cast<EditorSelectable>().ToList();
+            WriteJSON(objects);
         }
 
-        static void WriteJSON(EditorSelectable[] objects)
+        static void WriteJSON(List<EditorSelectable> objects)
         {
-            List<DefaultObject> defaultObjects = new List<DefaultObject>();
-            List<WaterObject> waterObjects = new List<WaterObject>();
-            List<MeshSliceObject> meshSliceObjects = new List<MeshSliceObject>();
-            List<FlipBlockObject> flipBlockObjects = new List<FlipBlockObject>();
-            List<PistonObject> pistonObjects = new List<PistonObject>();
-            List<RailObject> railObjects = new List<RailObject>();
-            List<SplineObject> splineObjects = new List<SplineObject>();
-            List<ColorBlockObject> colorBlockObjects = new List<ColorBlockObject>();
-
-            string worldStyle = EditorManager.instance.worldStyle.ToString();
-            Debug.Log("World Style: " + worldStyle);
+            int worldStyle = EditorManager.instance.worldStyle;
 
             var p1 = GameObject.Find("PlayerSpawn_1");
             var p2 = GameObject.Find("PlayerSpawn_2");
             var p3 = GameObject.Find("PlayerSpawn_3");
             var p4 = GameObject.Find("PlayerSpawn_4");
 
-            FloatObject spawnPos1 = new FloatObject(p1);
-            FloatObject spawnPos2 = new FloatObject(p2);
+            FloatObject spawnPos1;
+            FloatObject spawnPos2;
             FloatObject spawnPos3;
             FloatObject spawnPos4;
+
+            if (!p1)
+            {
+                spawnPos1 = new FloatObject(new Vector3(0, 0, 0));
+            }
+            else
+            {
+                spawnPos1 = new FloatObject(p1);
+            }
+
+            if (!p2)
+            {
+                spawnPos2 = new FloatObject(new Vector3(1, 0, 0));
+            }
+            else
+            {
+                spawnPos2 = new FloatObject(p2);
+            }
 
             if (!p3)
             {
@@ -118,48 +129,98 @@ namespace SBM_CustomLevels
                 spawnPos4 = new FloatObject(p4);
             }
 
-            for (int i = 0; i < objects.Length; i++)
-            {
-                string objectName = NameToPath(objects[i].name);
+            Dictionary<int, DefaultObject> objectsDict = new Dictionary<int, DefaultObject>();
 
-                if (objectName.Contains("Water"))
+            for (int i = 0; i < objects.Count; i++)
+            {
+                //TODO: make sure not to consider children BEFORE their parent
+                DefaultObject parent;
+
+                if (TryGetAsSBMObject(objects[i].gameObject, out DefaultObject parentObject))
                 {
-                    waterObjects.Add(new WaterObject(objects[i].gameObject));
+                    parent = parentObject;
                 }
-                else if (objectName.Contains("MinecartRail") && !objectName.Contains("Sleeper"))
+                else
                 {
-                    railObjects.Add(new RailObject(objects[i].gameObject));
+                    continue;
                 }
-                else if (objectName.Contains("SplineObject"))
+
+                parent.isChild = objects[i].isChild;
+
+                objectsDict.Add(objects[i].GetInstanceID(), parent);
+
+                foreach (Transform childTransform in objects[i].transform)
                 {
-                    splineObjects.Add(new SplineObject(objects[i].gameObject));
-                }
-                else if (objectName.Contains("SeeSaw") || objectName.Contains("StiffRod"))
-                {
-                    meshSliceObjects.Add(new MeshSliceObject(objects[i].gameObject));
-                }
-                else if (objectName.Contains("FlipBlock"))
-                {
-                    flipBlockObjects.Add(new FlipBlockObject(objects[i].gameObject));
-                }
-                else if (objectName.Contains("PistonPlatform"))
-                {
-                    pistonObjects.Add(new PistonObject(objects[i].gameObject));
-                }
-                else if (objectName.Contains("ColorBlock"))
-                {
-                    colorBlockObjects.Add(new ColorBlockObject(objects[i].gameObject));
-                }
-                else if (objectName != string.Empty && !objectName.Contains("Node"))
-                {
-                    defaultObjects.Add(new DefaultObject(objects[i].gameObject));
+                    if (childTransform.TryGetComponent(out EditorSelectable child) && !childTransform.name.Contains("Node"))
+                    {
+                        // make sure child is active to save, otherwise deleted children will be recorded
+                        if (childTransform.gameObject.activeSelf)
+                        {
+                            parent.children.Add(child.GetInstanceID());
+                        }
+                    }
                 }
             }
 
             string filePath = Path.Combine(LevelLoader_Mod.levelsPath, EditorManager.instance.selectedLevel);
 
-            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, spawnPos3, spawnPos4, defaultObjects, waterObjects, 
-                meshSliceObjects, flipBlockObjects, pistonObjects, railObjects, splineObjects, colorBlockObjects), Formatting.Indented) });
+            File.WriteAllLines(filePath, new string[] { JsonConvert.SerializeObject(new JSONObjectContainer(worldStyle, spawnPos1, spawnPos2, spawnPos3, spawnPos4, objectsDict), Formatting.Indented)});
+        }
+
+        private static bool TryGetAsSBMObject(GameObject gameObject,  out DefaultObject defaultObject)
+        {
+            string objectName = NameToPath(gameObject.name);
+
+            if (objectName.Contains("Water"))
+            {
+                defaultObject = new WaterObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("MinecartRail") && !objectName.Contains("Sleeper"))
+            {
+                defaultObject = new RailObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("SplineObject"))
+            {
+                defaultObject = new SplineObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("StiffRod") || objectName.Contains("SlipNSlide"))
+            {
+                defaultObject = new MeshSliceObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("SeeSaw"))
+            {
+                defaultObject = new SeeSawObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("FlipBlock"))
+            {
+                defaultObject = new FlipBlockObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("PistonPlatform"))
+            {
+                defaultObject = new PistonObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("ColorBlock"))
+            {
+                defaultObject = new ColorBlockObject(gameObject);
+                return true;
+            }
+            else if (objectName != string.Empty && !objectName.Contains("Node"))
+            {
+                defaultObject = new DefaultObject(gameObject);
+                return true;
+            }
+            else
+            {
+                defaultObject = null;
+                return false;
+            }
         }
 
         public static string NameToPath(string goName)
@@ -224,6 +285,5 @@ namespace SBM_CustomLevels
 
             return Path.Combine(path, goName);
         }
-
     }
 }
