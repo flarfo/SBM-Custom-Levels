@@ -5,17 +5,15 @@ using System.IO;
 using System.Reflection;
 using System.Linq;
 using System.Collections.Generic;
-using System.Collections;
-using System;
+using SBM_CustomLevels.Editor;
+using SBM_CustomLevels.Objects;
 
 namespace SBM_CustomLevels
 {
-    [BepInPlugin("flarfo.sbm.level_loader", "SBM_LevelLoader", "0.0.1")]
+    [BepInPlugin("flarfo.sbm.customlevels", "SBM_CustomLevels", "1.4.0")]
     public class LevelLoader_Mod : BaseUnityPlugin
     {
-        private readonly string pluginGUID = "flarfo.sbm.level_loader";
         private readonly string pluginName = "SBM_LevelLoader";
-        private readonly string pluginVersion = "0.0.1";
 
         public static string levelsPath = Path.Combine(Path.GetDirectoryName(Application.dataPath), "levels");
         public static string deathmatchPath = Path.Combine(levelsPath, "Deathmatch");
@@ -121,6 +119,8 @@ namespace SBM_CustomLevels
 
             int count = 0;
 
+            List<World> tempWorlds = new List<World>();
+
             // order by creation time, a bad partial fix for alphabetical not being consistent when new worlds added
             foreach (string worldPath in Directory.GetDirectories(levelsPath).OrderBy(p => new DirectoryInfo(p).CreationTime))
             {
@@ -128,14 +128,23 @@ namespace SBM_CustomLevels
                 {
                     break;
                 }
-
-                //List<string> levels = Directory.GetFiles(world, "*.sbm").ToList();
+                
                 string worldName = new DirectoryInfo(worldPath).Name;
+
+                if (worldName == "Deathmatch" || worldName == "Basketball" || worldName == "Carrot Grab")
+                {
+                    tempWorlds.Add(new World(worldName));
+                    count++;
+                    continue;
+                }
 
                 worldsList.Add(new World(worldName));
 
                 count++;
             }
+
+            // make sure party levels are always at the end
+            worldsList.AddRange(tempWorlds);
         }
 
         /// <summary>
