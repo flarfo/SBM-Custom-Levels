@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Linq;
-using System.IO;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
-using SplineMesh;
-using SBM.UI.Components;
+using SBM_CustomLevels.Objects;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Editor
 {
     internal class EditorUI : MonoBehaviour
     {
@@ -268,6 +266,8 @@ namespace SBM_CustomLevels
             Button redoButton = GameObject.Find("RedoButton").GetComponent<Button>();
             Button testPlayButton = GameObject.Find("TestPlayButton").GetComponent<Button>();
             Button pauseTestPlayButton = GameObject.Find("PauseTestPlayButton").GetComponent<Button>();
+            Button setParentButton = GameObject.Find("SetParentButton").GetComponent<Button>();
+            Button removeParentButton = GameObject.Find("RemoveParentButton").GetComponent<Button>();
             Button addWaterKeyframeButton = GameObject.Find("AddWaterKeyframeButton").GetComponent<Button>();
             Button addPistonKeyframeButton = GameObject.Find("AddPistonKeyframeButton").GetComponent<Button>();
             Button addRailNodeButton = GameObject.Find("AddRailButton").GetComponent<Button>();
@@ -372,6 +372,23 @@ namespace SBM_CustomLevels
                     
                     pauseIcon.gameObject.SetActive(!EditorManager.instance.testingPaused);
                     resumeIcon.gameObject.SetActive(EditorManager.instance.testingPaused);
+                }
+            });
+
+            setParentButton.onClick.AddListener(delegate
+            {
+                EditorManager.instance.settingParent ^= true;
+            });
+
+            removeParentButton.onClick.AddListener(delegate
+            {
+                foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
+                {
+                    if (selectable.isChild)
+                    {
+                        selectable.transform.parent = null;
+                        selectable.isChild = false;
+                    }
                 }
             });
 
@@ -1433,6 +1450,13 @@ namespace SBM_CustomLevels
                         case "StiffRod":
                             spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                             MeshSliceData meshData = spawnedObject.AddComponent<MeshSliceData>();
+
+                            if (button.gameObject.name == "SeeSaw")
+                            {
+                                var node = PivotNodeHelper.CreatePivotNode(spawnedObject.transform);
+                                node.pivotToMove = spawnedObject.GetComponent<SBM.Objects.World5.SeeSaw>().cj;
+                            }
+
                             DisableOtherUIs(mesh: true);
                             SetObjSettingsInformation(spawnedObject);
                             break;
@@ -1462,6 +1486,18 @@ namespace SBM_CustomLevels
                             curWater = fakeWater1;
                             ClearWaterKeyframes();
                             DisableOtherUIs(water: true);
+                            break;
+                        case "SlipNSlide":
+                            spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
+                            MeshSliceData meshData3 = spawnedObject.AddComponent<MeshSliceData>();
+                            meshData3.width = 1;
+                            meshData3.height = 0.25f;
+                            meshData3.depth = 0.8f;
+                            var meshSlice2 = spawnedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+                            meshSlice2.Size = new Vector3(1, 0.25f, 0.8f);
+                            meshSlice2.Regenerate();
+                            DisableOtherUIs(mesh: true);
+                            SetObjSettingsInformation(spawnedObject);
                             break;
                         case "IceSledSpikesGuide":
                             spawnedObject = Instantiate(EditorManager.iceSledSpikesGuide);
