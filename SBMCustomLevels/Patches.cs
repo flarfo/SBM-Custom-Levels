@@ -3,11 +3,10 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using System.Collections;
-using System.Linq;
-using System.Reflection.Emit;
 using UnityEngine.UI;
 using SceneSystem = SBM.Shared.SceneSystem;
 using SplineMesh;
+using SBM_CustomLevels.Editor;
 
 namespace SBM_CustomLevels
 {
