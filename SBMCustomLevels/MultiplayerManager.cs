@@ -396,14 +396,10 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
         static bool OverridePlayerRespawn(SBM.Shared.GameManager __instance)
         {
-            Debug.Log("Test 1");
-
             for (int i = 0; i < SBM.Shared.Player.Count; i++)
             {
                 SBM.Shared.Player.GetByIndex(i).SetVisible(false);
             }
-
-            Debug.Log("Test 2");
 
             // GameManager.ReorderSpawnPoints(List<Vector3> output) *NON-OVERRIDE*
             __instance.spawnPoints.Clear();
