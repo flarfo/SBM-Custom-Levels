@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using HarmonyLib;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Editor
 {
     [HarmonyPatch]
     internal class CameraController : MonoBehaviour
