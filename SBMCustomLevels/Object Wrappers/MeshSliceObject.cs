@@ -1,9 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
+using SBM_CustomLevels.Objects;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
     [Serializable]
     public class MeshSliceObject : DefaultObject
@@ -20,6 +20,8 @@ namespace SBM_CustomLevels
 
         public MeshSliceObject(GameObject gameObject) : base(gameObject)
         {
+            objectType = ObjectType.MeshSlice;
+
             MeshSliceData meshData = gameObject.GetComponent<MeshSliceData>();
 
             meshHeight = meshData.height;

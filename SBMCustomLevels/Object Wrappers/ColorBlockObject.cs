@@ -1,8 +1,9 @@
 ﻿using System;
 using UnityEngine;
 using Newtonsoft.Json;
+using SBM_CustomLevels.Objects;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
     [Serializable]
     public class ColorBlockObject : DefaultObject
@@ -20,6 +21,8 @@ namespace SBM_CustomLevels
 
         public ColorBlockObject(GameObject gameObject) : base(gameObject)
         {
+            objectType = ObjectType.ColorBlock;
+
             ColorData colorData = gameObject.GetComponent<ColorData>();
             r = colorData.color.r;
             g = colorData.color.g;

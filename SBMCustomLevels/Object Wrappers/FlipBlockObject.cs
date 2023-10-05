@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
+using SBM_CustomLevels.Objects;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
     [Serializable]
     public class FlipBlockObject : MeshSliceObject
@@ -22,6 +23,8 @@ namespace SBM_CustomLevels
 
         public FlipBlockObject(GameObject gameObject) : base(gameObject)
         {
+            objectType = ObjectType.FlipBlock;
+
             var flipBlock = gameObject.GetComponent<SBM.Objects.World5.FlipBlock>();
 
             spikesEnabled = flipBlock.spikesEnabled;

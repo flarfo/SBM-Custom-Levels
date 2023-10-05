@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Linq;
-using SplineMesh;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
+using SBM_CustomLevels.Objects;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
     [Serializable]
     public class SplineObject : DefaultObject
@@ -20,6 +20,8 @@ namespace SBM_CustomLevels
 
         public SplineObject(GameObject gameObject) : base(gameObject)
         {
+            objectType = ObjectType.Spline;
+
             // preserve node order
             List<SplineMakerNodeData> splineNodes = gameObject.GetComponentsInChildren<SplineMakerNodeData>().OrderBy(x => x.nodeID).ToList();
 

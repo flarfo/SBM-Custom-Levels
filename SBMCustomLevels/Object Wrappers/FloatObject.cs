@@ -2,7 +2,7 @@
 using UnityEngine;
 using Newtonsoft.Json;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
     [Serializable]
     public class FloatObject

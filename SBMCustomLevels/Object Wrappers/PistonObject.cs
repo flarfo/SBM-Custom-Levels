@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
+using SBM_CustomLevels.Objects;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
     [Serializable]
     public class PistonObject : MeshSliceObject
@@ -20,6 +21,8 @@ namespace SBM_CustomLevels
 
         public PistonObject(GameObject gameObject) : base(gameObject)
         {
+            objectType = ObjectType.Piston;
+
             var pistonPlatform = gameObject.GetComponent<SBM.Objects.World5.PistonPlatform>();
             pistonMaxTravel = pistonPlatform.pistonMaxTravel;
             pistonShaftLength = pistonPlatform.extraShaftLength;
