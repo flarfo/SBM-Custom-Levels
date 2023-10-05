@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using SplineMesh;
+using SBM_CustomLevels.ObjectWrappers;
+using SBM_CustomLevels.Editor;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Objects
 {
     public static class MinecartRailHelper
     {

@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Objects
 {
     public class PistonDataContainer : MonoBehaviour
     {

@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Objects
 {
     public class MeshSliceData : MonoBehaviour
     {
