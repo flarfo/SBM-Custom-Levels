@@ -1,13 +1,30 @@
 ﻿using UnityEngine;
 using System;
+using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
+    public enum ObjectType
+    {
+        Default,
+        ColorBlock,
+        FlipBlock,
+        MeshSlice,
+        Piston,
+        Rail,
+        SeeSaw,
+        Spline,
+        Water
+    }
+
     [Serializable]
     public class DefaultObject
     {
         public string objectName;
+        public ObjectType objectType = ObjectType.Default;
+        public List<int> children = new List<int>();
+        public bool isChild = false;
 
         public float[] position = new float[3];
         public float[] rotation = new float[3];
@@ -16,7 +33,7 @@ namespace SBM_CustomLevels
         [JsonConstructor]
         public DefaultObject()
         {
-
+            
         }
 
         public DefaultObject(GameObject gameObject)
@@ -35,7 +52,6 @@ namespace SBM_CustomLevels
             scale[1] = gameObject.transform.localScale.y;
             scale[2] = gameObject.transform.localScale.z;
         }
-
 
         public Vector3 GetPosition()
         {

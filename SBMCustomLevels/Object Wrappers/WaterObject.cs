@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
+using SBM_CustomLevels.Objects;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
     [Serializable]
     public class WaterObject : DefaultObject
@@ -23,6 +24,8 @@ namespace SBM_CustomLevels
 
         public WaterObject(GameObject gameObject) : base(gameObject)
         {
+            objectType = ObjectType.Water;
+
             WaterDataContainer fakeWater = gameObject.GetComponent<WaterDataContainer>();
 
             waterHeight = fakeWater.height;

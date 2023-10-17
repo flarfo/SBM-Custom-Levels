@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Linq;
-using System.IO;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
-using SplineMesh;
-using SBM.UI.Components;
+using SBM_CustomLevels.Objects;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Editor
 {
     internal class EditorUI : MonoBehaviour
     {
@@ -19,21 +17,21 @@ namespace SBM_CustomLevels
         //MAKE NAME OF OBJECT APPEAR WHEN HOVERED IN UI
         public Text nameField;
 
-        public InputField[] positionField;
-        public InputField[] rotationField;
-        public InputField[] scaleField;
-        public InputField[] sizeField;
+        private InputField[] positionField;
+        private InputField[] rotationField;
+        private InputField[] scaleField;
+        private InputField[] sizeField;
 
         public Text lastSavedText;
 
         private GameObject uiBarBottom;
         private bool bottomBarEnabled = false;
 
-        private Button[] worldButtons = new Button[6];
+        private Button[] worldButtons = new Button[7];
         private Button selectButton;
         private Button moveButton;
         private Button stampButton;
-        private GameObject[] worldUIs = new GameObject[6];
+        private GameObject[] worldUIs = new GameObject[7];
 
         private GameObject inspectorUI;
         private GameObject waterUI;
@@ -41,36 +39,48 @@ namespace SBM_CustomLevels
         private GameObject railUI;
         private GameObject objSettingsUI;
         private GameObject splineUI;
+        private GameObject colorUI;
 
         public WaterDataContainer curWater;
-        public PistonDataContainer curPiston;
+        private InputField[] waterSizeField;
         private RectTransform waterKeyframeContainer;
+
+        public PistonDataContainer curPiston;
         private RectTransform pistonKeyframeContainer;
+
         private Vector2 defaultKeyframeContainerSize = new Vector2(100, 168);
         private readonly int maxKeyframes = 16;
 
         public SplineMeshNodeData curRailNode;
-        public InputField[] railPositionField;
-        public InputField[] railDirectionField;
-        public InputField[] railUpField;
+        private InputField[] railPositionField;
+        private InputField[] railDirectionField;
+        private InputField[] railUpField;
 
-        public GameObject flipBlockSettingsContainer;
-        public Toggle flipBlockSpikes;
-        public InputField flipBlockDegrees;
-        public InputField flipBlockTime;
-        public Button[] flipBlockDirection;
+        private GameObject flipBlockSettingsContainer;
+        private InputField flipBlockDegrees;
+        private InputField flipBlockTime;
+        private Button[] flipBlockDirection;
         private GameObject[] flipBlockCheckmarks = new GameObject[2];
         private Toggle[] flipBlockSpikeToggles;
 
-        public GameObject pistonSettingsContainer;
-        public InputField pistonMaxTravel;
-        public InputField pistonShaftLength;
+        private GameObject pistonSettingsContainer;
+        private InputField pistonMaxTravel;
+        private InputField pistonShaftLength;
 
         public SplineMakerNodeData curSplineNode;
-        public InputField[] splinePositionField;
+        private InputField[] splinePositionField;
+
+        private InputField[] colorValuesField;
+        private RawImage colorDisplay;
 
         private void Update()
         {
+            // don't allow alternate keyboard input while testing, constantly enables and disables tools
+            if (EditorManager.instance.Testing && !EditorManager.instance.testingPaused)
+            {
+                return;
+            }
+
             if (Input.GetKeyDown(KeyCode.Q))
             {
                 OnStampButton();
@@ -84,11 +94,6 @@ namespace SBM_CustomLevels
             if (Input.GetKeyDown(KeyCode.E))
             {
                 OnSelectButton();
-            }
-
-            if (Input.GetKeyDown(KeyCode.BackQuote))
-            {
-                OnWorldButton(5);
             }
 
             // dont change UI object button world if an inputfield is selected (so updating pos/rot/scale does not change UI window)
@@ -127,6 +132,16 @@ namespace SBM_CustomLevels
             {
                 OnWorldButton(4);
             }
+
+            if (Input.GetKeyDown(KeyCode.BackQuote))
+            {
+                OnWorldButton(5);
+            }
+
+            if (Input.GetKeyDown(KeyCode.Alpha6))
+            {
+                OnWorldButton(6);
+            }
         }
 
         //initialize the editor ui, finding necessary gameobjects and applying respective functionality
@@ -157,12 +172,17 @@ namespace SBM_CustomLevels
 
             splinePositionField = GameObject.Find("SplineNodePositionContainer").GetComponentsInChildren<InputField>();
 
+            colorValuesField = GameObject.Find("ColorRGBContainer").GetComponentsInChildren<InputField>();
+
             inspectorUI = GameObject.Find("Inspector");
             waterUI = GameObject.Find("WaterContainer");
             pistonUI = GameObject.Find("PistonContainer");
             railUI = GameObject.Find("RailContainer");
             objSettingsUI = GameObject.Find("ObjectSettingsContainer");
             splineUI = GameObject.Find("SplineContainer");
+            colorUI = GameObject.Find("ColorContainer");
+            
+            colorDisplay = colorUI.transform.Find("Background/ColorDisplay").GetComponent<RawImage>();
 
             waterKeyframeContainer = GameObject.Find("WaterKeyframeContainer").GetComponent<RectTransform>();
             pistonKeyframeContainer = GameObject.Find("PistonKeyframeContainer").GetComponent<RectTransform>();
@@ -184,6 +204,9 @@ namespace SBM_CustomLevels
 
             GameObject splineDragBar = splineUI.transform.Find("DragBar").gameObject;
             splineDragBar.AddComponent<DraggableUI>().target = splineUI.transform;
+            
+            GameObject colorDragBar = colorUI.transform.Find("DragBar").gameObject;
+            colorDragBar.AddComponent<DraggableUI>().target = colorUI.transform;
 
             Button inspectorMinimizeButton = inspectorDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
             Button waterMinimizeButton = waterDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
@@ -191,7 +214,8 @@ namespace SBM_CustomLevels
             Button railMinimizeButton = railDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
             Button objSettingsMinimizeButton = objSettingsDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
             Button splineMinimizeButton = splineDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
-
+            Button colorMinimizeButton = colorDragBar.transform.Find("MinimizeButton").GetComponent<Button>();
+            
             inspectorMinimizeButton.onClick.AddListener(delegate
             {
                 GameObject background = inspectorDragBar.transform.parent.Find("Background").gameObject;
@@ -227,6 +251,12 @@ namespace SBM_CustomLevels
                 GameObject background = splineDragBar.transform.parent.Find("Background").gameObject;
                 background.SetActive(!background.activeSelf);
             });
+            
+            colorMinimizeButton.onClick.AddListener(delegate
+            {
+                GameObject background = colorDragBar.transform.parent.Find("Background").gameObject;
+                background.SetActive(!background.activeSelf);
+            });
 
             moveButton = GameObject.Find("MoveButton").GetComponent<Button>();
             selectButton = GameObject.Find("SelectButton").GetComponent<Button>();
@@ -234,6 +264,10 @@ namespace SBM_CustomLevels
             Button deleteButton = GameObject.Find("DeleteButton").GetComponent<Button>();
             Button undoButton = GameObject.Find("UndoButton").GetComponent<Button>();
             Button redoButton = GameObject.Find("RedoButton").GetComponent<Button>();
+            Button testPlayButton = GameObject.Find("TestPlayButton").GetComponent<Button>();
+            Button pauseTestPlayButton = GameObject.Find("PauseTestPlayButton").GetComponent<Button>();
+            Button setParentButton = GameObject.Find("SetParentButton").GetComponent<Button>();
+            Button removeParentButton = GameObject.Find("RemoveParentButton").GetComponent<Button>();
             Button addWaterKeyframeButton = GameObject.Find("AddWaterKeyframeButton").GetComponent<Button>();
             Button addPistonKeyframeButton = GameObject.Find("AddPistonKeyframeButton").GetComponent<Button>();
             Button addRailNodeButton = GameObject.Find("AddRailButton").GetComponent<Button>();
@@ -301,6 +335,61 @@ namespace SBM_CustomLevels
             redoButton.onClick.AddListener(delegate
             {
                 UndoManager.Redo();
+            });
+
+            // start/stop testing
+            var testPlayIcon = testPlayButton.transform.Find("PlayIcon");
+            var testEndIcon = testPlayButton.transform.Find("EndPlayIcon");
+            testEndIcon.gameObject.SetActive(false);
+
+            var pauseIcon = pauseTestPlayButton.transform.Find("PauseIcon");
+            var resumeIcon = pauseTestPlayButton.transform.Find("ResumeIcon");
+            resumeIcon.gameObject.SetActive(false);
+
+            testPlayButton.onClick.AddListener(delegate
+            {
+                EditorManager.instance.Testing = !EditorManager.instance.Testing;
+                
+                if (EditorManager.instance.Testing)
+                {
+                    EditorManager.instance.testingPaused = false;
+                }
+
+                testEndIcon.gameObject.SetActive(EditorManager.instance.Testing);
+                testPlayIcon.gameObject.SetActive(!EditorManager.instance.Testing);
+
+                pauseIcon.gameObject.SetActive(true);
+                resumeIcon.gameObject.SetActive(false);
+            });
+
+            // pause testing
+            pauseTestPlayButton.onClick.AddListener(delegate
+            {
+                if (EditorManager.instance.Testing)
+                {
+                    EditorManager.instance.testingPaused = !EditorManager.instance.testingPaused;
+                    Physics.autoSimulation = !EditorManager.instance.testingPaused;
+                    
+                    pauseIcon.gameObject.SetActive(!EditorManager.instance.testingPaused);
+                    resumeIcon.gameObject.SetActive(EditorManager.instance.testingPaused);
+                }
+            });
+
+            setParentButton.onClick.AddListener(delegate
+            {
+                EditorManager.instance.settingParent ^= true;
+            });
+
+            removeParentButton.onClick.AddListener(delegate
+            {
+                foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
+                {
+                    if (selectable.isChild)
+                    {
+                        selectable.transform.parent = null;
+                        selectable.isChild = false;
+                    }
+                }
             });
 
             addWaterKeyframeButton.onClick.AddListener(delegate
@@ -377,8 +466,11 @@ namespace SBM_CustomLevels
             {
                 if (curWater)
                 {
-                    curWater.keyframes.RemoveAt(curWater.keyframes.Count - 1);
-                    SetWaterKeyframes();
+                    if (curWater.keyframes.Count >= 1)
+                    {
+                        curWater.keyframes.RemoveAt(curWater.keyframes.Count - 1);
+                        SetWaterKeyframes();
+                    }
                 }
             });
 
@@ -386,8 +478,11 @@ namespace SBM_CustomLevels
             {
                 if (curPiston)
                 {
-                    curPiston.keyframes.RemoveAt(curPiston.keyframes.Count - 1);
-                    SetPistonKeyframes();
+                    if (curPiston.keyframes.Count >= 1)
+                    {
+                        curPiston.keyframes.RemoveAt(curPiston.keyframes.Count - 1);
+                        SetPistonKeyframes();
+                    }
                 }
             });
 
@@ -720,15 +815,89 @@ namespace SBM_CustomLevels
                 newKeyframe.SetActive(false);
             }
 
+            waterSizeField = waterUI.transform.Find("Background/WaterSizeContainer").GetComponentsInChildren<InputField>();
+            waterSizeField[0].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!waterSizeField[0].isFocused)
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
+                {
+                    WaterDataContainer fakeWater = selectable.gameObject.GetComponent<WaterDataContainer>();
+
+                    Vector3 scale = selectable.transform.localScale;
+
+                    if (float.TryParse(value, out float result) && fakeWater)
+                    {
+                        fakeWater.width = result;
+
+                        var meshSlice = selectable.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                        if (meshSlice)
+                        {
+                            meshSlice.Size = new Vector3(fakeWater.width, fakeWater.height, 1);
+                            meshSlice.Regenerate();
+                        }
+                        else
+                        {
+                            selectable.transform.localScale = new Vector3(fakeWater.width, fakeWater.height, 1);
+                        }
+                    }
+                }
+            });
+
+            waterSizeField[1].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!waterSizeField[1].isFocused)
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
+                {
+                    WaterDataContainer fakeWater = selectable.gameObject.GetComponent<WaterDataContainer>();
+
+                    Vector3 scale = selectable.transform.localScale;
+
+                    if (float.TryParse(value, out float result) && fakeWater)
+                    {
+                        fakeWater.height = result;
+
+                        var meshSlice = selectable.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                        if (meshSlice)
+                        {
+                            meshSlice.Size = new Vector3(fakeWater.width, fakeWater.height, 1);
+                            meshSlice.Regenerate();
+                        }
+                        else
+                        {
+                            selectable.transform.localScale = new Vector3(fakeWater.width, fakeWater.height, 1);
+                        }
+                    }
+                }
+            });
+
             // flip block object UI
-            flipBlockSpikes = flipBlockSettingsContainer.transform.Find("Spikes").GetComponentInChildren<Toggle>();
+            flipBlockSpikeToggles = flipBlockSettingsContainer.transform.Find("Spikes").GetComponentsInChildren<Toggle>();
             flipBlockDegrees = flipBlockSettingsContainer.transform.Find("FlipDegrees").GetComponentInChildren<InputField>();
             flipBlockTime = flipBlockSettingsContainer.transform.Find("Flip Time").GetComponentInChildren<InputField>();
             flipBlockDirection = flipBlockSettingsContainer.transform.Find("Direction").GetComponentsInChildren<Button>();
             flipBlockCheckmarks[0] = flipBlockDirection[0].transform.Find("Left Checkmark").gameObject;
             flipBlockCheckmarks[1] = flipBlockDirection[1].transform.Find("Right Checkmark").gameObject;
 
-            flipBlockSpikeToggles = flipBlockSettingsContainer.transform.Find("Spikes").GetComponentsInChildren<Toggle>();
             for (int i = 0; i < flipBlockSpikeToggles.Length; i++)
             {
                 int index = i;
@@ -1031,6 +1200,105 @@ namespace SBM_CustomLevels
                 }
             });
 
+            // R
+            colorValuesField[0].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!colorValuesField[0].isFocused)
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                if (int.TryParse(value, out int result))
+                {
+                    foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
+                    {
+                        if (selectable.TryGetComponent(out ColorData colorData))
+                        {
+                            if (result > 255)
+                            {
+                                result = 255;
+                            }
+
+                            colorData.color.r = (byte)result;
+                            colorDisplay.color = colorData.color;
+
+                            selectable.GetComponent<MeshRenderer>().material.color = colorData.color;
+                        }
+                    }
+                }
+            });
+
+            // G
+            colorValuesField[1].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!colorValuesField[1].isFocused)
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                if (int.TryParse(value, out int result))
+                {
+                    foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
+                    {
+                        if (selectable.TryGetComponent(out ColorData colorData))
+                        {
+                            if (result > 255)
+                            {
+                                result = 255;
+                            }
+
+                            colorData.color.g = (byte)result;
+                            colorDisplay.color = colorData.color;
+
+                            selectable.GetComponent<MeshRenderer>().material.color = colorData.color;
+                        }
+                    }
+                }
+            });
+
+            // B
+            colorValuesField[2].onValueChanged.AddListener(delegate (string value)
+            {
+                if (!colorValuesField[2].isFocused)
+                {
+                    return;
+                }
+
+                if (EditorManager.instance.curSelected.Count == 0)
+                {
+                    return;
+                }
+
+                if (int.TryParse(value, out int result))
+                {
+                    foreach (EditorSelectable selectable in EditorManager.instance.curSelected)
+                    {
+                        if (selectable.TryGetComponent(out ColorData colorData))
+                        {
+                            if (result > 255)
+                            {
+                                result = 255;
+                            }
+
+                            colorData.color.b = (byte)result;
+                            colorDisplay.color = colorData.color;
+
+                            selectable.GetComponent<MeshRenderer>().material.color = colorData.color;
+                        }
+                    }
+                }
+            });
+
             //save button saves when clicked
             lastSavedText = GameObject.Find("LastSavedText").GetComponent<Text>();
             Button saveButton = GameObject.Find("SaveButton").GetComponent<Button>();
@@ -1099,6 +1367,7 @@ namespace SBM_CustomLevels
             worldButtons[3] = GameObject.Find("World4Button").GetComponent<Button>();
             worldButtons[4] = GameObject.Find("World5Button").GetComponent<Button>();
             worldButtons[5] = GameObject.Find("OptionsButton").GetComponent<Button>();
+            worldButtons[6] = GameObject.Find("PartyButton").GetComponent<Button>();
 
             worldUIs[0] = GameObject.Find("World1");
             worldUIs[1] = GameObject.Find("World2");
@@ -1106,6 +1375,7 @@ namespace SBM_CustomLevels
             worldUIs[3] = GameObject.Find("World4");
             worldUIs[4] = GameObject.Find("World5");
             worldUIs[5] = GameObject.Find("OptionsMenu");
+            worldUIs[6] = GameObject.Find("PartyMenu");
 
             AddWorldUIEvent(0);
             AddWorldUIEvent(1);
@@ -1113,6 +1383,7 @@ namespace SBM_CustomLevels
             AddWorldUIEvent(3);
             AddWorldUIEvent(4);
             AddWorldUIEvent(5);
+            AddWorldUIEvent(6);
 
             //world1-5 button functionality (opens block panel at bottom)
             foreach (Button button in GameObject.Find("UIBar_Bottom").GetComponentsInChildren<Button>())
@@ -1172,24 +1443,30 @@ namespace SBM_CustomLevels
                             fakeWater.height = 2;
                             curWater = fakeWater;
                             ClearWaterKeyframes();
-                            DisableOtherUIs("water");
+                            DisableOtherUIs(water: true);
                             break;
                         case "FlipBlock":
                         case "SeeSaw":
                         case "StiffRod":
                             spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                             MeshSliceData meshData = spawnedObject.AddComponent<MeshSliceData>();
-                            DisableOtherUIs("mesh");
+
+                            if (button.gameObject.name == "SeeSaw")
+                            {
+                                var node = PivotNodeHelper.CreatePivotNode(spawnedObject.transform);
+                                node.pivotToMove = spawnedObject.GetComponent<SBM.Objects.World5.SeeSaw>().cj;
+                            }
+
+                            DisableOtherUIs(mesh: true);
                             SetObjSettingsInformation(spawnedObject);
                             break;
                         case "PistonPlatform":
                             spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                             MeshSliceData meshData1 = spawnedObject.AddComponent<MeshSliceData>();
-                            DisableOtherUIs("mesh");
                             PistonDataContainer pistonData = spawnedObject.AddComponent<PistonDataContainer>();
                             curPiston = pistonData;
                             ClearPistonKeyframes();
-                            DisableOtherUIs("piston");
+                            DisableOtherUIs(piston: true, mesh: true);
                             SetObjSettingsInformation(spawnedObject);
                             break;
                         case "WaterTank":
@@ -1208,13 +1485,25 @@ namespace SBM_CustomLevels
                             fakeWater1.w5 = true;
                             curWater = fakeWater1;
                             ClearWaterKeyframes();
-                            DisableOtherUIs("water");
+                            DisableOtherUIs(water: true);
+                            break;
+                        case "SlipNSlide":
+                            spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
+                            MeshSliceData meshData3 = spawnedObject.AddComponent<MeshSliceData>();
+                            meshData3.width = 1;
+                            meshData3.height = 0.25f;
+                            meshData3.depth = 0.8f;
+                            var meshSlice2 = spawnedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+                            meshSlice2.Size = new Vector3(1, 0.25f, 0.8f);
+                            meshSlice2.Regenerate();
+                            DisableOtherUIs(mesh: true);
+                            SetObjSettingsInformation(spawnedObject);
                             break;
                         case "IceSledSpikesGuide":
                             spawnedObject = Instantiate(EditorManager.iceSledSpikesGuide);
                             break;
                         case "Wormhole":
-                            DisableOtherUIs("inspector");
+                            DisableOtherUIs();
                             if (EditorManager.instance.wormhole)
                             {
                                 EditorManager.instance.wormhole.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
@@ -1226,7 +1515,7 @@ namespace SBM_CustomLevels
                             EditorManager.instance.wormhole = spawnedObject;
                             break;
                         case "Carrot":
-                            DisableOtherUIs("inspector");
+                            DisableOtherUIs();
                             if (EditorManager.instance.carrot)
                             {
                                 EditorManager.instance.carrot.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
@@ -1237,13 +1526,17 @@ namespace SBM_CustomLevels
                             spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                             EditorManager.instance.carrot = spawnedObject;
                             break;
+                        case "PartyCarrot":
+                            DisableOtherUIs();
+                            spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath("Carrot"))) as GameObject;
+                            break;
                         case "MinecartRail":
-                            DisableOtherUIs("rail");
+                            DisableOtherUIs(rail: true);
                             Vector3 pos = new Vector3(centerPos.x, centerPos.y, 0);
                             spawnedObject = MinecartRailHelper.SpawnNewRail(pos);
                             break;
                         case "SplinePlatform":
-                            DisableOtherUIs("inspector");
+                            DisableOtherUIs();
                             Vector3 pos1 = new Vector3(centerPos.x, centerPos.y, 0);
                             spawnedObject = SplineMakerHelper.SpawnNewSpline(pos1);
                             break;
@@ -1260,234 +1553,89 @@ namespace SBM_CustomLevels
                             spawnedObject = Instantiate(EditorManager.scaffoldPanelBrown);
                             break;
                         case "FloppyRod":
-                            DisableOtherUIs("inspector");
+                            DisableOtherUIs();
                             flipBlockSettingsContainer.SetActive(false);
                             spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                             break;
+                        case "ColorBlock":
+                            DisableOtherUIs(color: true);
+                            spawnedObject = Instantiate(EditorManager.colorBlock);
+                            SetColorInformation(spawnedObject);
+                            break;
+                        case "ColorBlockCorner":
+                            DisableOtherUIs(color: true);
+                            spawnedObject = Instantiate(EditorManager.colorBlockCorner);
+                            SetColorInformation(spawnedObject);
+                            break;
                         case "PlayerSpawn":
-                            DisableOtherUIs("inspector");
-                            if (!EditorManager.instance.spawn1.activeSelf)
+                            DisableOtherUIs();
+                            for (int i = 0; i < EditorManager.instance.spawns.Length; i++)
                             {
-                                EditorManager.instance.spawn1.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
-                                EditorManager.instance.spawn1.SetActive(true);
+                                if (EditorManager.instance.spawns[i])
+                                {
+                                    if (!EditorManager.instance.spawns[i].activeSelf)
+                                    {
+                                        EditorManager.instance.spawns[i].transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
+                                        EditorManager.instance.spawns[i].SetActive(true);
 
-                                return;
+                                        return;
+                                    }
+                                }
+                                else
+                                {
+                                    EditorManager.instance.spawns[i] = Instantiate(EditorManager.playerSpawn);
+                                    EditorManager.instance.spawns[i].name = "PlayerSpawn_" + (i + 1);
+                                    EditorManager.instance.spawns[i].transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
+                                    EditorManager.instance.spawns[i].transform.localScale = new Vector3(1, 2, 1);
+                                    EditorManager.instance.spawns[i].AddComponent<SBM.Shared.PlayerSpawnPoint>();
+                                    EditorManager.instance.spawns[i].AddComponent<Outline>();
+                                    EditorManager.instance.spawns[i].AddComponent<EditorSelectable>();
+                                    
+                                    return;
+                                }
                             }
-                            else if (!EditorManager.instance.spawn2.activeSelf)
-                            {
-                                EditorManager.instance.spawn2.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
-                                EditorManager.instance.spawn2.SetActive(true);
 
-                                return;
-                            }
                             return;
                         case "MinecartRail_Sleeper":
-                            DisableOtherUIs("inspector");
+                            DisableOtherUIs();
                             spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                             spawnedObject.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
                             break;
                         case "KillBounds":
-                            DisableOtherUIs("inspector");
+                            DisableOtherUIs();
                             spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                             Material mat = new Material(Shader.Find("Standard"));
-                            mat.color = Color.red;
+                            mat.color = new Color32(255, 0, 0, 128);
+
+                            // for transparency
+                            mat.SetFloat("_Mode", 3);
+                            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                            mat.EnableKeyword("_ALPHABLEND_ON");
+                            mat.renderQueue = 3000;
+
                             spawnedObject.AddComponent<MeshRenderer>().material = mat;
                             break;
                         case "BoulderDestroyer":
-                            DisableOtherUIs("inspector");
+                            DisableOtherUIs();
                             spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                             Material mat1 = new Material(Shader.Find("Standard"));
-                            mat1.color = new Color(0.5f, 0, 0);
+                            mat1.color = new Color32(128, 0, 0, 128);
+
+                            // for transparency
+                            mat1.SetFloat("_Mode", 3);
+                            mat1.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                            mat1.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                            mat1.EnableKeyword("_ALPHABLEND_ON");
+                            mat1.renderQueue = 3000;
+
                             spawnedObject.AddComponent<MeshRenderer>().material = mat1;
                             break;
                         default:
-                            DisableOtherUIs("inspector");
+                            DisableOtherUIs();
                             spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
                             break;
                     }
-
-                    /*if (button.gameObject.name == "Water_W4")
-                    {
-                        spawnedObject = Instantiate(EditorManager.fakeWater);
-
-                        WaterDataContainer fakeWater = spawnedObject.GetComponent<WaterDataContainer>();
-                        fakeWater.width = 3;
-                        fakeWater.height = 2;
-                        curWater = fakeWater;
-                        ClearWaterKeyframes();
-                        DisableOtherUIs("water");
-                    }
-                    else if (button.gameObject.name == "FlipBlock" || button.gameObject.name == "SeeSaw" || button.gameObject.name == "StiffRod" || button.gameObject.name == "PistonPlatform" || button.gameObject.name == "WaterTank")
-                    {
-                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
-
-                        MeshSliceData meshData = spawnedObject.AddComponent<MeshSliceData>();
-
-                        if (button.gameObject.name != "WaterTank")
-                        {
-                            DisableOtherUIs("mesh");
-
-                            if (button.gameObject.name == "PistonPlatform")
-                            {
-                                PistonDataContainer pistonData = spawnedObject.AddComponent<PistonDataContainer>();
-                                curPiston = pistonData;
-                                ClearPistonKeyframes();
-
-                                DisableOtherUIs("piston");
-                            }
-
-                            SetObjSettingsInformation(spawnedObject);
-                        }
-                        else
-                        {
-                            meshData.width = 1;
-                            meshData.height = 1;
-                            meshData.depth = 1;
-
-                            var meshSlice = spawnedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
-                            meshSlice.Size = new Vector3(1, 1, 1);
-                            meshSlice.Regenerate();
-
-                            Destroy(spawnedObject.transform.Find("Water_W5").gameObject);
-
-                            WaterDataContainer fakeWater = spawnedObject.AddComponent<WaterDataContainer>();
-                            fakeWater.width = 1;
-                            fakeWater.height = 1;
-                            fakeWater.w5 = true;
-                            curWater = fakeWater;
-                            ClearWaterKeyframes();
-                            DisableOtherUIs("water");
-                        }
-
-                        // ALSO: add ui for modifying size, replace water ui with general purpose ui
-                    }
-                    else if (button.gameObject.name == "IceSledSpikesGuide")
-                    {
-                        spawnedObject = Instantiate(EditorManager.iceSledSpikesGuide);
-                    }
-                    else if (button.gameObject.name == "Wormhole")
-                    {
-                        DisableOtherUIs("inspector");
-
-                        if (EditorManager.instance.wormhole)
-                        {
-                            EditorManager.instance.wormhole.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
-                            EditorManager.instance.wormhole.SetActive(true);
-
-                            return;
-                        }
-
-                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
-                        EditorManager.instance.wormhole = spawnedObject;
-                    }
-                    else if (button.gameObject.name == "Carrot")
-                    {
-                        DisableOtherUIs("inspector");
-
-                        if (EditorManager.instance.carrot)
-                        {
-                            EditorManager.instance.carrot.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
-                            EditorManager.instance.carrot.SetActive(true);
-
-                            return;
-                        }
-
-                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
-                        EditorManager.instance.carrot = spawnedObject;
-                    }
-                    else if (button.gameObject.name == "MinecartRail")
-                    {
-                        DisableOtherUIs("rail");
-
-                        Vector3 pos = new Vector3(centerPos.x, centerPos.y, 0);
-                        spawnedObject = MinecartRailHelper.SpawnNewRail(pos);
-                    }
-                    else if (button.gameObject.name == "SplinePlatform")
-                    {
-                        DisableOtherUIs("inspector");
-
-                        Vector3 pos = new Vector3(centerPos.x, centerPos.y, 0);
-                        spawnedObject = SplineMakerHelper.SpawnNewSpline(pos);
-                    }
-                    else if (button.gameObject.name == "ScaffoldingBlock")
-                    {
-
-                    }
-                    else if (button.gameObject.name == "ScaffoldingCorner")
-                    {
-
-                    }
-                    else if (button.gameObject.name == "FloppyRod")
-                    {
-                        DisableOtherUIs("inspector");
-                        //objSettingsUI.SetActive(true);
-                        flipBlockSettingsContainer.SetActive(false);
-                        //floppyRodContainer.SetActive(true);
-
-                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
-                        //SetObjSettingsInformation(spawnedObject);
-                    }
-                    /*else if (button.gameObject.name == "ConveyorBelt")
-                    {
-                        Vector3 pos = new Vector3(centerPos.x, centerPos.y, 0);
-
-                        spawnedObject = ConveyorBeltHelper.SpawnNewConveyor(pos);
-                    }
-                    else if (button.gameObject.name == "PlayerSpawn")
-                    {
-                        DisableOtherUIs("inspector");
-
-                        if (!EditorManager.instance.spawn1.activeSelf)
-                        {
-                            EditorManager.instance.spawn1.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
-                            EditorManager.instance.spawn1.SetActive(true);
-
-                            return;
-                        }
-                        else if (!EditorManager.instance.spawn2.activeSelf)
-                        {
-                            EditorManager.instance.spawn2.transform.position = new Vector3(centerPos.x, centerPos.y, 0); //0 = point at which objects exist by default
-                            EditorManager.instance.spawn2.SetActive(true);
-
-                            return;
-                        }
-
-                        return;
-                    }
-                    else if (button.gameObject.name == "MinecartRail_Sleeper")
-                    {
-                        DisableOtherUIs("inspector");
-
-                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
-                        spawnedObject.transform.rotation = Quaternion.Euler(new Vector3(0, 0, 0));
-                    }
-                    else if (button.gameObject.name == "KillBounds")
-                    {
-                        DisableOtherUIs("inspector");
-
-                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
-
-                        Material mat = new Material(Shader.Find("Standard"));
-                        mat.color = Color.red;
-                        spawnedObject.AddComponent<MeshRenderer>().material = mat;
-                    }
-                    else if (button.gameObject.name == "BoulderDestroyer")
-                    {
-                        DisableOtherUIs("inspector");
-
-                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
-
-                        Material mat = new Material(Shader.Find("Standard"));
-                        mat.color = new Color(0.5f, 0, 0);
-                        spawnedObject.AddComponent<MeshRenderer>().material = mat;
-                    }
-                    else
-                    {
-                        DisableOtherUIs("inspector");
-
-                        spawnedObject = Instantiate(Resources.Load(RecordLevel.NameToPath(button.gameObject.name))) as GameObject;
-                    }
-                    */
 
                     EnableRailUI(false);
                     EnableSplineUI(false);
@@ -1599,6 +1747,7 @@ namespace SBM_CustomLevels
             railUI.SetActive(false);
             objSettingsUI.SetActive(false);
             splineUI.SetActive(false);
+            colorUI.SetActive(false);
             uiBarBottom.SetActive(false);
         }
 
@@ -1751,67 +1900,21 @@ namespace SBM_CustomLevels
             objSettingsUI.SetActive(enable);
         }
 
-        public void DisableOtherUIs(string toEnable)
+        public void EnableColorUI(bool enable)
         {
-            switch (toEnable)
-            {
-                case "inspector":
-                    EnableInspector(true);
-                    EnableWaterUI(false);
-                    EnablePistonUI(false);
-                    EnableRailUI(false);
-                    EnableSplineUI(false);
-                    EnableObjSettingsUI(false);
-                    break;
-                case "water":
-                    EnableInspector(true);
-                    EnableWaterUI(true);
-                    EnablePistonUI(false);
-                    EnableRailUI(false);
-                    EnableSplineUI(false);
-                    EnableObjSettingsUI(false);
-                    break;
-                case "piston":
-                    EnableInspector(true);
-                    EnableWaterUI(false);
-                    EnablePistonUI(true);
-                    EnableRailUI(false);
-                    EnableSplineUI(false);
-                    EnableObjSettingsUI(true);
-                    break;
-                case "rail":
-                    EnableInspector(true);
-                    EnableWaterUI(false);
-                    EnablePistonUI(false);
-                    EnableRailUI(true);
-                    EnableSplineUI(false);
-                    EnableObjSettingsUI(false);
-                    break;
-                case "spline":
-                    EnableInspector(true);
-                    EnableWaterUI(false);
-                    EnablePistonUI(false);
-                    EnableRailUI(true);
-                    EnableSplineUI(true);
-                    EnableObjSettingsUI(false);
-                    break;
-                case "mesh":
-                    EnableInspector(true);
-                    EnableWaterUI(false);
-                    EnablePistonUI(false);
-                    EnableRailUI(false);
-                    EnableSplineUI(false);
-                    EnableObjSettingsUI(true);
-                    break;
-                default:
-                    EnableInspector(false);
-                    EnableWaterUI(false);
-                    EnablePistonUI(false);
-                    EnableRailUI(false);
-                    EnableSplineUI(false);
-                    EnableObjSettingsUI(false);
-                    break;
-            }
+            colorUI.SetActive(enable);
+        }
+
+
+        public void DisableOtherUIs(bool inspector = true, bool water = false, bool piston = false, bool rail = false, bool spline = false, bool mesh = false, bool color = false)
+        {
+            EnableInspector(inspector);
+            EnableWaterUI(water);
+            EnablePistonUI(piston);
+            EnableRailUI(rail);
+            EnableSplineUI(spline);
+            EnableObjSettingsUI(mesh);
+            EnableColorUI(color);
         }
 
         public void SetWaterKeyframes()
@@ -1825,6 +1928,9 @@ namespace SBM_CustomLevels
             {
                 return;
             }
+
+            waterSizeField[0].text = curWater.width.ToString();
+            waterSizeField[1].text = curWater.height.ToString();
 
             int resizeCount = 0;
 
@@ -2005,6 +2111,19 @@ namespace SBM_CustomLevels
             }
         }
 
+        public void SetColorInformation(GameObject gameObject)
+        {
+            ColorData colorData = gameObject.GetComponent<ColorData>();
+
+            if (colorData)
+            {
+                colorDisplay.color = colorData.color;
+                colorValuesField[0].text = colorData.color.r.ToString();
+                colorValuesField[1].text = colorData.color.g.ToString();
+                colorValuesField[2].text = colorData.color.b.ToString();
+            }
+        }
+
         // When given button pressed, open respective blocks panel and disable other block panels that might be open. Disables/enables bottom UI bar.
         private void AddWorldUIEvent(int buttonId)
         {
@@ -2100,20 +2219,6 @@ namespace SBM_CustomLevels
                     if (float.TryParse(value, out float result))
                     {
                         scale[coordinate] = result;
-
-                        WaterDataContainer fakeWater = selectable.gameObject.GetComponent<WaterDataContainer>();
-
-                        if (fakeWater)
-                        {
-                            if (coordinate == 0)
-                            {
-                                fakeWater.width = result;
-                            }
-                            else if (coordinate == 1)
-                            {
-                                fakeWater.height = result;
-                            }
-                        }
 
                         selectable.transform.localScale = scale;
                     }

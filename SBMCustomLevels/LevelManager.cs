@@ -1,14 +1,14 @@
 ﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using System.Collections;
 using System.IO;
 using System.Linq;
-using System.Collections.Generic;
 using System;
 using System.Reflection;
-using SplineMesh;
+using SBM_CustomLevels.Editor;
+using SBM_CustomLevels.ObjectWrappers;
+using SBM_CustomLevels.Objects;
 using SceneSystem = SBM.Shared.SceneSystem;
 using Systems = SBM.Shared.Systems;
 
@@ -47,6 +47,16 @@ namespace SBM_CustomLevels
 
         public string PreviousSceneName { get; private set; }
 
+        public enum LevelType 
+        { 
+            Editor,
+            Story,
+            Basketball,
+            Deathmatch,
+            CarrotGrab,
+            None
+        }
+
         private void Awake()
         {
             if (instance == null)
@@ -63,7 +73,7 @@ namespace SBM_CustomLevels
             }
         }
 
-        private void LoadLevel(bool isEditor, bool newLevel, string path)
+        private void LoadLevel(bool isEditor, bool newLevel, string path, LevelType levelType)
         {
             lastLevelWasEditor = isEditor;
 
@@ -102,7 +112,7 @@ namespace SBM_CustomLevels
                     }
                     else
                     {
-                        EditorManager.LoadEditorLevel(path);
+                        EditorManager.SetupLoadEditorLevel(path);
                     }
 
                     EditorManager.instance.InitializeEditor();
@@ -115,10 +125,54 @@ namespace SBM_CustomLevels
                     SceneSystem.TargetSceneIndex = 255;
 
                     lastWorldStyle = worldStyle;
-                    worldStyle = LoadJSONLevel(path);
+
+                    string rawText = File.ReadAllText(path);
+
+                    try
+                    {
+                        JSONObjectContainer json = JsonConvert.DeserializeObject<JSONObjectContainer>(rawText);
+                        string version = json.Version;
+
+                        // to determine style of loading for later incompatibilities: 
+                        switch (version) 
+                        {
+                            case "1.4":
+                                worldStyle = LoadJSONLevel(json, levelType);
+                                break;
+                            default:
+                                worldStyle = LoadJSONLevel(json, levelType);
+                                break;
+                        }
+                    }
+                    catch
+                    {
+                        Debug.LogError("Legacy level loaded! Reverting to old loading method...");
+
+                        worldStyle = (int)char.GetNumericValue(rawText[0]);
+                        rawText = rawText.Remove(0, 1);
+
+                        LegacyJSONObjectContainer json = JsonConvert.DeserializeObject<LegacyJSONObjectContainer>(rawText);
+                        LegacyLoadJSONLevel(json, levelType, worldStyle);
+                    }
                 }
 
-                Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject); //must happen AFTER carrot is loaded in, otherwise some stuff is goofed^
+                switch (levelType)
+                {
+                    //must happen AFTER carrot is loaded in, otherwise some stuff is goofed^
+                    case LevelType.Editor:
+                    case LevelType.Story:
+                        Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject);
+                        break;
+                    case LevelType.Basketball:
+                        Instantiate(Resources.Load("prefabs/level/LevelPrefab_Basketball") as GameObject);
+                        break;
+                    case LevelType.Deathmatch:
+                        Instantiate(Resources.Load("prefabs/level/LevelPrefab_Deathmatch") as GameObject);
+                        break;
+                    case LevelType.CarrotGrab:
+                        Instantiate(Resources.Load("prefabs/level/LevelPrefab_CarrotGrab") as GameObject);
+                        break;
+                }
 
                 if (isEditor)
                 {
@@ -162,92 +216,57 @@ namespace SBM_CustomLevels
             }
         }
 
-        /*private void LoadLevel(bool isEditor, bool newLevel, string path)
+        // New loading - version 1.4 and later
+        private int LoadJSONLevel(JSONObjectContainer json, LevelType levelType)
         {
-            LoadLevelScene(path, isEditor);
-
-            int worldStyle = 1;
-
-            if (isEditor)
-            {
-                if (newLevel)
-                {
-                    EditorManager.LoadNewEditorLevel();
-                }
-                else
-                {
-                    EditorManager.LoadEditorLevel(path);
-                }
-
-                EditorManager.instance.InitializeEditor();
-            }
-            else
-            {
-                lastWorldStyle = worldStyle;
-                worldStyle = LoadJSONLevel(path);
-            }
-
-            Instantiate(Resources.Load("prefabs/level/LevelPrefab_Story") as GameObject); //must happen AFTER carrot is loaded in, otherwise some stuff is goofed^
-
-            if (isEditor)
-            {
-                //add camera controller, (camera loaed in LevelPrefab_Story), moved from InitializeEditor as camera didnt exist previously...)
-                Camera.main.gameObject.AddComponent<CameraController>();
-
-                EditorManager.instance.editorCamera = Camera.main;
-
-                Destroy(GameObject.Find("Player 1"));
-                GameObject player2 = GameObject.Find("Player 2");
-                if (player2)
-                {
-                    Destroy(player2);
-                }
-
-                SBM.Shared.Audio.AudioSystem.FadeOutMusicVolume();
-            }
-            else
-            {
-                //play correct music for world style (based on world background selected)
-                SBM.Shared.Audio.Song song = SBM.Shared.Level.LevelSystem.GetWorld(worldStyle - 1).Song;
-
-                bool playIntro = true;
-
-                // if last world style is different, play intro
-                // if last world style is same, dont play intro
-                if (lastWorldStyle == worldStyle)
-                {
-                    playIntro = false;
-                }
-
-                SBM.Shared.Audio.AudioSystem.instance.ScheduleSong(song, playIntro);
-            }
-        }*/
-
-        private int LoadJSONLevel(string path)
-        {
-            Debug.Log(path);
+            bool carrot = false;
+            bool wormhole = false;
 
             if (!Directory.Exists(LevelLoader_Mod.levelsPath))
             {
                 Directory.CreateDirectory(LevelLoader_Mod.levelsPath);
             }
 
-            if (!File.Exists(path))
+            CreateBackground(json.worldType);
+
+            foreach (var objPair in json.objects)
             {
-                return -1;
+                DefaultObject obj = objPair.Value;
+
+                if (obj.isChild)
+                {
+                    continue;
+                }
+
+                string name = EditorManager.SpawnObject(obj, json.objects).name;
+                
+                if (name == "Carrot(Clone)")
+                {
+                    carrot = true;
+                }
+                else if (name == "Wormhole(Clone)")
+                {
+                    wormhole = true;
+                }
             }
 
-            string rawText = File.ReadAllText(path);
+            // ensure that a carrot and wormhole are loaded for story levels
+            if (!carrot && levelType == LevelType.Story)
+            {
+                Instantiate(Resources.Load(RecordLevel.NameToPath("Carrot")));
+            }
 
-            int worldStyle = (int)char.GetNumericValue(rawText[0]);
-            rawText = rawText.Remove(0, 1);
+            if (!wormhole && levelType == LevelType.Story)
+            {
+                var wh = Instantiate(Resources.Load(RecordLevel.NameToPath("Wormhole")) as GameObject);
+                wh.transform.position = new Vector3(5, 0, 0);
+            }
 
-            CreateBackground(worldStyle);
-
-            ObjectContainer json = JsonConvert.DeserializeObject<ObjectContainer>(rawText);
-
+            #region Spawns
             Vector3 spawnPos_1;
             Vector3 spawnPos_2;
+            Vector3 spawnPos_3;
+            Vector3 spawnPos_4;
 
             try
             {
@@ -267,6 +286,111 @@ namespace SBM_CustomLevels
             {
                 Debug.LogError("Missing spawnPos_2 in json! Setting to (1,0,0).");
                 spawnPos_2 = new Vector3(1, 0, 0);
+            }
+
+            try
+            {
+                spawnPos_3 = json.spawnPosition3.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_3 in json! Setting to NULL.");
+                spawnPos_3 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
+
+            try
+            {
+                spawnPos_4 = json.spawnPosition4.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_4 in json! Setting to NULL.");
+                spawnPos_4 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
+
+            GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
+            playerSpawn_1.transform.position = spawnPos_1;
+
+            GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
+            playerSpawn_2.transform.position = spawnPos_2;
+
+            if (spawnPos_3 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_3 = new GameObject("PlayerSpawn_3", typeof(SBM.Shared.PlayerSpawnPoint));
+                playerSpawn_3.transform.position = spawnPos_3;
+            }
+
+            if (spawnPos_4 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_4 = new GameObject("PlayerSpawn_4", typeof(SBM.Shared.PlayerSpawnPoint));
+                playerSpawn_4.transform.position = spawnPos_4;
+            }
+            #endregion
+
+            if (SBM.Shared.Networking.NetworkSystem.IsInSession)
+            {
+                SBM.Shared.Networking.NetworkSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
+                SBM.Shared.Level.LevelSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
+            }
+
+            loading = false;
+
+            return json.worldType;
+        }
+
+        // Legacy - version 1.3 and earlier
+        private int LegacyLoadJSONLevel(LegacyJSONObjectContainer json, LevelType levelType, int worldStyle)
+        {
+            if (!Directory.Exists(LevelLoader_Mod.levelsPath))
+            {
+                Directory.CreateDirectory(LevelLoader_Mod.levelsPath);
+            }
+
+            CreateBackground(worldStyle);
+
+            Vector3 spawnPos_1;
+            Vector3 spawnPos_2;
+            Vector3 spawnPos_3;
+            Vector3 spawnPos_4;
+
+            try
+            {
+                spawnPos_1 = json.spawnPosition1.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_1 in json! Setting to (0,0,0).");
+                spawnPos_1 = new Vector3(0, 0, 0);
+            }
+
+            try
+            {
+                spawnPos_2 = json.spawnPosition2.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_2 in json! Setting to (1,0,0).");
+                spawnPos_2 = new Vector3(1, 0, 0);
+            }
+
+            try
+            {
+                spawnPos_3 = json.spawnPosition3.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_3 in json! Setting to NULL.");
+                spawnPos_3 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
+
+            try
+            {
+                spawnPos_4 = json.spawnPosition4.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_4 in json! Setting to NULL.");
+                spawnPos_4 = new Vector3(0, 0, -999); // indicate a non-set spawn
             }
 
             try
@@ -312,18 +436,22 @@ namespace SBM_CustomLevels
                     }
                 }
 
-                if (!wormholeLoaded)
+                // ensure that wormhole and carrot always exist to avoid crash (only important for StoryLevels)
+                if (levelType == LevelType.Story)
                 {
-                    Debug.LogError("Missing wormhole in json! Instantiating default wormhole!");
+                    if (!wormholeLoaded)
+                    {
+                        Debug.LogError("Missing wormhole in json! Instantiating default wormhole!");
 
-                    GameObject wormhole = Instantiate(Resources.Load(RecordLevel.NameToPath("Wormhole"))) as GameObject;
-                    wormhole.transform.position = new Vector3(5, 0, 0);
-                }
+                        GameObject wormhole = Instantiate(Resources.Load(RecordLevel.NameToPath("Wormhole"))) as GameObject;
+                        wormhole.transform.position = new Vector3(5, 0, 0);
+                    }
 
-                if (!carrotLoaded)
-                {
-                    Debug.LogError("Missing carrot in json! Instantiating default carrot!");
-                    Instantiate(Resources.Load(RecordLevel.NameToPath("Carrot")));
+                    if (!carrotLoaded)
+                    {
+                        Debug.LogError("Missing carrot in json! Instantiating default carrot!");
+                        Instantiate(Resources.Load(RecordLevel.NameToPath("Carrot")));
+                    }
                 }
             }
             catch
@@ -393,11 +521,55 @@ namespace SBM_CustomLevels
 
                     meshSlice.Size = meshSize;
                     meshSlice.Regenerate();
+
+                    if (meshSliceObject.objectName.Contains("SlipNSlide"))
+                    {
+                        var colliderSizers = loadedObject.GetComponentsInChildren<Catobyte.Utilities.BoxColliderAutoSizer>();
+                        foreach (var sizer in colliderSizers)
+                        {
+                            sizer.ResizeBoxCollider();
+                        }
+
+                        var edgeRail1 = loadedObject.transform.GetChild(1);
+                        edgeRail1.localScale = new Vector3(edgeRail1.localScale.x, meshSliceObject.meshWidth, edgeRail1.localScale.y);
+                        edgeRail1.localPosition = new Vector3(-0.5f * meshSliceObject.meshWidth, edgeRail1.localPosition.y, edgeRail1.localPosition.z);
+
+                        var edgeRail2 = loadedObject.transform.GetChild(2);
+                        edgeRail2.localScale = new Vector3(edgeRail2.localScale.x, meshSliceObject.meshWidth, edgeRail2.localScale.y);
+                        edgeRail2.localPosition = new Vector3(-0.5f * meshSliceObject.meshWidth, edgeRail2.localPosition.y, edgeRail2.localPosition.z);
+                    }
                 }
             }
             catch
             {
                 Debug.LogError("Missing meshSliceObjects in json!");
+            }
+
+            try
+            {
+                foreach (SeeSawObject seeSawObject in json.seeSawObjects)
+                {
+                    GameObject loadedObject;
+
+                    loadedObject = Instantiate(Resources.Load(seeSawObject.objectName) as GameObject, seeSawObject.GetPosition(), Quaternion.Euler(seeSawObject.GetRotation()));
+
+                    Vector3 meshSize = new Vector3(seeSawObject.meshWidth, seeSawObject.meshHeight, seeSawObject.meshDepth);
+
+                    var seeSaw = loadedObject.GetComponent<SBM.Objects.World5.SeeSaw>();
+                    seeSaw.platformSize = meshSize;
+                    seeSaw.Regenerate();
+
+                    var meshSlice = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                    meshSlice.Size = meshSize;
+                    meshSlice.Regenerate();
+
+                    loadedObject.GetComponent<SBM.Objects.World5.SeeSaw>().cj.anchor = new Vector3(seeSawObject.pivotPos[0], seeSawObject.pivotPos[1], seeSawObject.pivotPos[2]);
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing seeSawObjects in json!");
             }
 
             try
@@ -509,12 +681,48 @@ namespace SBM_CustomLevels
                 Debug.LogError("Missing splineObjects in json!");
             }
 
+            try
+            {
+                foreach (ColorBlockObject colorBlockObject in json.colorBlockObjects)
+                {
+                    GameObject loadedObject;
+
+                    if (colorBlockObject.isCorner)
+                    {
+                        loadedObject = Instantiate(EditorManager.colorBlockCorner, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+                    else
+                    {
+                        loadedObject = Instantiate(EditorManager.colorBlock, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+
+                    loadedObject.transform.localScale = colorBlockObject.GetScale();
+                    loadedObject.GetComponent<MeshRenderer>().material.color = new Color32((byte)colorBlockObject.r, (byte)colorBlockObject.g, (byte)colorBlockObject.b, 255);
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing colorBlockObjects in json!");
+            }
+
             GameObject playerSpawn_1 = new GameObject("PlayerSpawn_1", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_1.transform.position = spawnPos_1;
 
             GameObject playerSpawn_2 = new GameObject("PlayerSpawn_2", typeof(SBM.Shared.PlayerSpawnPoint));
             playerSpawn_2.transform.position = spawnPos_2;
 
+            if (spawnPos_3 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_3 = new GameObject("PlayerSpawn_3", typeof(SBM.Shared.PlayerSpawnPoint));
+                playerSpawn_3.transform.position = spawnPos_3;
+            }
+
+            if (spawnPos_4 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_4 = new GameObject("PlayerSpawn_4", typeof(SBM.Shared.PlayerSpawnPoint));
+                playerSpawn_4.transform.position = spawnPos_4;
+            }
+            
             if (SBM.Shared.Networking.NetworkSystem.IsInSession)
             {
                 SBM.Shared.Networking.NetworkSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
@@ -526,7 +734,7 @@ namespace SBM_CustomLevels
             return worldStyle;
         }
 
-        public void BeginLoadLevel(bool isEditor, bool newLevel, string path, int level, World world = null)
+        public void BeginLoadLevel(bool isEditor, bool newLevel, string path, int level, LevelType levelType, World world = null)
         {
             if (!File.Exists(path))
             {
@@ -561,7 +769,7 @@ namespace SBM_CustomLevels
 
                 currentLevel = path;
 
-                if (!LevelManager.InLevel)
+                if (!LevelManager.InLevel && levelType == LevelType.Story)
                 {
                     SBM.Shared.Cameras.MenuCamera menuCamera = GameObject.FindGameObjectWithTag("MainCamera").GetComponent<SBM.Shared.Cameras.MenuCamera>();
                     menuCamera.targetPos = new Vector3(-0.715f, 4.05f, 21.96f);
@@ -569,7 +777,7 @@ namespace SBM_CustomLevels
 
                     SBM.UI.Utilities.Focus.UIFocusable.FocusedObject.gameObject.transform.parent.GetComponent<SBM.UI.Utilities.Transitioner.UITransitioner>().Transition_Out_To_Right(); //parent of level button is level selector
                     SBM.UI.Utilities.Focus.UIFocusable.ReleaseFocusedObject();
-                    wormholeManager.WormholeAnimation(path, level);
+                    wormholeManager.WormholeAnimation(path, level, levelType);
                 }
                 else
                 {
@@ -577,7 +785,7 @@ namespace SBM_CustomLevels
 
                     SceneSystem.Unload(PreviousSceneName).completed += delegate (AsyncOperation o)
                     {
-                        LoadLevel(isEditor, newLevel, path);
+                        LoadLevel(isEditor, newLevel, path, levelType);
                     };
 
                 }   
@@ -586,7 +794,7 @@ namespace SBM_CustomLevels
             {
                 SceneSystem.Unload(PreviousSceneName).completed += delegate (AsyncOperation o)
                 {
-                    LoadLevel(isEditor, newLevel, path);
+                    LoadLevel(isEditor, newLevel, path, LevelManager.LevelType.Editor);
                 };
             }
         }
@@ -597,11 +805,9 @@ namespace SBM_CustomLevels
 
             if (currentLevel != null)
             {
-                List<string> levelPaths = currentWorld.levels;
-
-                if (levelPaths.Count-1 > levelNumber-1) // if next level exists... levelNumber-1 since level number is + 1.
+                if (currentWorld.levels.Count - 1 > levelNumber-1) // if next level exists... levelNumber-1 since level number is + 1.
                 {
-                    nextLevel = levelPaths[levelNumber];
+                    nextLevel = currentWorld.levels[levelNumber].levelPath;
                 }
 
                 levelNumber++;
@@ -667,6 +873,7 @@ namespace SBM_CustomLevels
 
             private int level;
             private string path;
+            private LevelType levelType;
 
             private void Awake()
             {
@@ -681,12 +888,13 @@ namespace SBM_CustomLevels
                 }
             }
 
-            public void WormholeAnimation(string _path, int _level)
+            public void WormholeAnimation(string _path, int _level, LevelType _levelType)
             {
                 ragdolls = GameObject.Find("Ragdolls (Story Mode)").GetComponent<SBM.UI.MainMenu.StoryMode.UIStoryModeRagdolls>();
 
                 path = _path;
                 level = _level;
+                levelType = _levelType;
 
                 if (ragdolls.cTransitionOutToSelectedLevel != null)
                 {
@@ -838,7 +1046,7 @@ namespace SBM_CustomLevels
                                 LevelManager.InLevel = true;
                                 LevelManager.instance.levelNumber = transitionManager.level;
 
-                                LevelManager.instance.LoadLevel(false, false, transitionManager.path);
+                                LevelManager.instance.LoadLevel(false, false, transitionManager.path, transitionManager.levelType);
                             };
 
                             return false;

@@ -1,11 +1,13 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
-using System.Text;
-using System.Runtime.InteropServices;
+using System.Linq;
 using Catobyte.Networking;
 using SBM.Shared.Networking;
 using HarmonyLib;
 using UnityEngine;
+using UITransitioner = SBM.UI.Utilities.Transitioner.UITransitioner;
+using UIFocusable = SBM.UI.Utilities.Focus.UIFocusable;
 
 namespace SBM_CustomLevels
 {
@@ -13,6 +15,7 @@ namespace SBM_CustomLevels
     static class MultiplayerManager
     {
         private static string level;
+
         public static string LevelID
         {
             get
@@ -24,6 +27,9 @@ namespace SBM_CustomLevels
                 level = value;
             }
         }
+
+        private static GameObject onlineInviteButton;
+        private static List<GameObject> connectedPlayerUIs = new List<GameObject>();
 
         private static NetworkChannel CustomChannel;
 
@@ -39,7 +45,7 @@ namespace SBM_CustomLevels
         // create new packet receiver for "OnReceivedCustomLevelData" so mod specific data can be sent between client and server.
         [HarmonyPatch(typeof(NetworkSystem), "OnNetworkSession_MemberJoined")]
         [HarmonyPrefix]
-        static void UpdatePacketReceivers(NetworkUserId memberId)
+        static void UpdatePacketReceivers(NetworkSystem __instance, NetworkUserId memberId)
         {
             bool userIsLocal = Network.Service.UserIsLocal(memberId);
 
@@ -49,8 +55,30 @@ namespace SBM_CustomLevels
             }
             else
             {
-                Network.Session.SubscribeToReceive<CustomSceneData>(memberId,CustomChannel, new OnDataReceived(OnReceivedCustomLevelData), true);
+                // clear existing player roster, since it is updated again in ConfigureCoopPlayersForNetworkPlay
+                OverrideCoopPlayerProfileCount();
+                // Debug.Log($"OnNetworkSession_MemberJoined {Network.Service.GetUsernameById(memberId)}");
+                Network.Session.SubscribeToReceive<CustomSceneData>(memberId, CustomChannel, new OnDataReceived(OnReceivedCustomLevelData), true);
             }
+        }
+
+        private static string GetLevelByHash(string worldName, ulong levelHash)
+        {
+            foreach (World world in LevelLoader_Mod.worldsList)
+            {
+                if (world.Name == worldName)
+                {
+                    foreach (Level level in world.levels)
+                    {
+                        if (level.levelHash == levelHash)
+                        {
+                            return level.levelPath;
+                        }
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static void OnReceivedCustomLevelData(NetworkUserId id, TickNumber tickNumber, NetworkData data)
@@ -68,6 +96,9 @@ namespace SBM_CustomLevels
 
                 Debug.Log("CUSTOM WORLD: " + sceneData.world);
                 Debug.Log("CUSTOM LEVEL: " + sceneData.level);
+                Debug.Log("LEVEL TYPE: " + (LevelManager.LevelType)sceneData.levelType);
+
+                LevelManager.LevelType levelType = (LevelManager.LevelType)sceneData.levelType;
 
                 // escape condition if nonexistant level loads or other fault in transmitting level
                 if (sceneData.level == ushort.MaxValue)
@@ -79,39 +110,93 @@ namespace SBM_CustomLevels
                     }
                 }
 
-                World receivedWorld = null;
+                string receivedLevel = "";
 
-                foreach (World world in LevelLoader_Mod.worldsList)
+                // if level type is party, determine and send level based on level itself, not world
+                if (levelType == LevelManager.LevelType.Deathmatch)
                 {
-                    if (world.WorldHash == sceneData.world)
+                    if (!Directory.Exists(LevelLoader_Mod.deathmatchPath))
                     {
-                        receivedWorld = world;
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("World not found! Potential mismatch between client and server?");
+                        return;
                     }
+
+                    receivedLevel = GetLevelByHash("Deathmatch", sceneData.world);
                 }
-
-                if (receivedWorld == null)
+                else if (levelType == LevelManager.LevelType.Basketball)
                 {
-                    if (LevelManager.InLevel)
+                    if (!Directory.Exists(LevelLoader_Mod.basketballPath))
                     {
-                        SBM.Shared.SceneSystem.LoadScene("Menu");
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("World not found! Potential mismatch between client and server?");
+                        return;
                     }
 
-                    Debug.Log("World not found! Potential mismatch between client and server?");
+                    receivedLevel = GetLevelByHash("Basketball", sceneData.world);
+                }
+                else if (levelType == LevelManager.LevelType.CarrotGrab)
+                {
+                    if (!Directory.Exists(LevelLoader_Mod.carrotGrabPath))
+                    {
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("World not found! Potential mismatch between client and server?");
+                        return;
+                    }
+
+                    receivedLevel = GetLevelByHash("Carrot Grab", sceneData.world);
+                }
+                else // if not party level type, determine id of level based on index in the sent world
+                {
+                    World receivedWorld = null;
+
+                    foreach (World world in LevelLoader_Mod.worldsList)
+                    {
+                        if (world.WorldHash == sceneData.world)
+                        {
+                            receivedWorld = world;
+                        }
+                    }
+
+                    if (receivedWorld == null)
+                    {
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("World not found! Potential mismatch between client and server?");
+                        return;
+                    }
+                    else if (sceneData.level > receivedWorld.levels.Count - 1)
+                    {
+                        if (LevelManager.InLevel)
+                        {
+                            SBM.Shared.SceneSystem.LoadScene("Menu");
+                        }
+
+                        Debug.Log("Level not found! Potential mismatch between client and server?");
+                        return;
+                    }
+
+                    LevelManager.instance.BeginLoadLevel(false, false, receivedWorld.levels[sceneData.level].levelPath, sceneData.level + 1, levelType, receivedWorld); // add isNetworkClient ?
                     return;
                 }
-                else if (sceneData.level > receivedWorld.levels.Count - 1)
-                {
-                    if (LevelManager.InLevel)
-                    {
-                        SBM.Shared.SceneSystem.LoadScene("Menu");
-                    }
 
-                    Debug.Log("Level not found! Potential mismatch between client and server?");
-                    return;
-                }
-
-                LevelManager.instance.BeginLoadLevel(false, false, receivedWorld.levels[sceneData.level], sceneData.level + 1, receivedWorld); // add isNetworkClient ? 
-                // send callback confirming load, THEN activate network ?
+                // if level type is party, determine and send level based on level itself, not world
+                LevelManager.instance.BeginLoadLevel(false, false, receivedLevel, sceneData.level + 1, levelType);
             }
         }
 
@@ -125,7 +210,7 @@ namespace SBM_CustomLevels
         // NetworkSystem.SceneIsSyncedWithRemoteUsers is FALSE! GameManager yields null until this is TRUE!
 
         // if (custom level to be loaded)
-        public static void SendCustomLevelData(ulong world, int level)
+        public static void SendCustomLevelData(ulong world, int level, LevelManager.LevelType levelType)
         {
             if (!Network.Session.Exists)
             {
@@ -135,6 +220,7 @@ namespace SBM_CustomLevels
             CustomSceneData sceneData = new CustomSceneData();
             sceneData.world = world;
             sceneData.level = (ushort)level;
+            sceneData.levelType = (ushort)levelType;
 
             Network.Session.SendToAll(CustomChannel, sceneData);
         }
@@ -142,7 +228,256 @@ namespace SBM_CustomLevels
         #endregion
 
         #region Patches
-        
+
+        // adjust steam maxplayers to always be 4 instead of 2
+        [HarmonyPatch(typeof(NetworkSystem), "HostSession")]
+        [HarmonyPrefix]
+        static void IncreaseMaxPlayers(ref int maxPlayers, SessionAccess access)
+        {
+            maxPlayers = 4;
+        }
+
+        // called on both client and server, use to update UI when a new player (beyond 2nd) joins
+        [HarmonyPatch(typeof(NetworkSystem), "OnNetworkUser_ConnectionReady")]
+        [HarmonyPostfix]
+        static void UpdateOnPlayerJoined(NetworkUser user)
+        {
+            if (NetworkSystem.IsHost && SBM.Shared.PlayerRoster.IsFull)
+            {
+                return;
+            }
+
+            string usernameById = Network.Service.GetUsernameById(user.Id);
+            Debug.Log("Player Joined: " + usernameById);
+        }
+
+
+        [HarmonyPatch(typeof(NetworkSystem), "OnNetworkSession_MemberLeft")]
+        [HarmonyPostfix]
+        static void UpdateOnPlayerLeft(NetworkSystem __instance, NetworkUserId memberId)
+        {
+            if (!NetworkSystem.IsInSession)
+            {
+                return;
+            }
+
+            NetworkUser userById = __instance.GetUserById(memberId);
+
+            for (int i = 0; i < __instance.users.Count; i++)
+            {
+                if (userById == __instance.localUser)
+                {
+                    continue;
+                }
+
+                if (userById == __instance.users[i] && i != 1) // dont delete original ui
+                {
+                    GameObject.Destroy(connectedPlayerUIs[i - 1]);
+                    connectedPlayerUIs.RemoveAt(i - 1);
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(SBM.UI.MainMenu.StoryMode.UIStoryNetworkInvite), "BeginInvitation")]
+        [HarmonyPrefix]
+        static bool PreventHostSessionIfExists()
+        {
+            Debug.Log("Attempted to host session... returned: " + !NetworkSystem.IsInSession);
+
+            return !NetworkSystem.IsInSession;
+        }
+
+        [HarmonyPatch(typeof(SBM.UI.Components.UIGameModeSetter), "SetGameMode_CoopStory")]
+        [HarmonyPrefix]
+        static void UpdateOnlineInviteButtonCoop()
+        {
+            onlineInviteButton.SetActive(true);
+        }
+
+        [HarmonyPatch(typeof(SBM.UI.Components.UIGameModeSetter), "SetGameMode_Story")]
+        [HarmonyPrefix]
+        static void UpdateOnlineInviteButtonStory()
+        {
+            onlineInviteButton.SetActive(false);
+        }
+
+        // non-specifically patch UIWorld5Model awake since it is at the same time as UIWorldSelector creation
+        // allow the invite UI to properly invite more than 1 person
+        [HarmonyPatch(typeof(SBM.UI.MainMenu.StoryMode.UIWorld5Model), "Awake")]
+        [HarmonyPostfix]
+        static void UpdateInviteUI()
+        {
+            // Networked Multiplayer Overrides
+            Transform uiParent = GameObject.Find("Screen_StoryMode").transform;
+
+            var inviteButton = uiParent.Find("UI_Bars/UI_Bar_Bottom/Networking/Network_Offline/Button_Invite").GetComponent<UIFocusable>();
+            // re-parent invite button so that it is not deactivated on load and can thus be pressed again for more invitations
+            inviteButton.transform.SetParent(inviteButton.transform.parent.parent);
+            onlineInviteButton = inviteButton.gameObject;
+
+            inviteButton.onSubmitSuccess = new UnityEngine.Events.UnityEvent();
+            inviteButton.onSubmitSuccess.AddListener(delegate
+            {
+                if (!NetworkSystem.IsInSession)
+                {
+                    var networkPanel = uiParent.Find("Panel_NetworkInvite").GetComponent<UITransitioner>();
+                    networkPanel.Transition_In_From_Top();
+
+                    return;
+                }
+
+                if (NetworkSystem.IsHost)
+                {
+                    if (NetworkSystem.UserCount > 1)
+                    {
+                        var networkPanel = uiParent.Find("Panel_NetworkInvite").GetComponent<UITransitioner>();
+
+                        networkPanel.Transition_Out_To_Top();
+                        GameObject.Find("World Selector").GetComponent<UIFocusable>().Focus();
+                        NetworkSystem.InviteViaServiceOverlay();
+                    }
+                }
+            });
+
+            var networkInvite = uiParent.Find("Panel_NetworkInvite").GetComponent<SBM.UI.MainMenu.StoryMode.UIStoryNetworkInvite>();
+            var networkOnlineUI = uiParent.Find("UI_Bars/UI_Bar_Bottom/Networking/Network_Online").GetComponent<UITransitioner>();
+
+            for (int i = 1; i < NetworkSystem.UserCount; i++)
+            {
+                if (i == 1)
+                {
+                    connectedPlayerUIs.Clear();
+                    networkOnlineUI.Transition_Out_To_Top();
+                    networkOnlineUI.anchoredPosWhenShown = new Vector3(125, 0);
+                    networkOnlineUI.Transition_In_From_Bottom();
+                    networkOnlineUI.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>().PlayerNumber = 1;
+                    continue;
+                }
+
+                var networkGO = GameObject.Instantiate(networkOnlineUI, networkOnlineUI.transform.parent);
+                connectedPlayerUIs.Add(networkGO.gameObject);
+                networkGO.anchoredPosWhenShown = new Vector3(125 + i * 100, 0);
+                networkGO.Transition_In_From_Bottom();
+                var playerIcon = networkGO.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>();
+                playerIcon.PlayerNumber = i + 1;
+                playerIcon.Refresh();
+            }
+
+            networkInvite.onInviteSuccess = new UnityEngine.Events.UnityEvent();
+            networkInvite.onInviteSuccess.AddListener(delegate
+            {
+                if (!NetworkSystem.IsHost)
+                {
+                    return;
+                }
+
+                networkInvite.GetComponent<UITransitioner>().Transition_Out_To_Top();
+
+                if (NetworkSystem.UserCount <= 2)
+                {
+                    connectedPlayerUIs.Clear();
+                    networkOnlineUI.anchoredPosWhenShown = new Vector3(125, 0);
+                    networkOnlineUI.Transition_In_From_Bottom();
+                    networkOnlineUI.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>().PlayerNumber = NetworkSystem.UserCount;
+                }
+                else
+                {
+                    // duplicate Network_Online UI
+                    var networkGO = GameObject.Instantiate(networkOnlineUI, networkOnlineUI.transform.parent);
+                    connectedPlayerUIs.Add(networkGO.gameObject);
+                    networkGO.anchoredPosWhenShown = new Vector3(125 + NetworkSystem.UserCount * 100, 0);
+                    networkGO.Transition_In_From_Bottom();
+                    var playerIcon = networkGO.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>();
+                    playerIcon.PlayerNumber = NetworkSystem.UserCount;
+                    playerIcon.Refresh();
+                }
+
+                GameObject.FindObjectOfType<SBM.UI.MainMenu.StoryMode.UIWorldSelector>().GetComponent<UIFocusable>().Focus();
+                GameObject.FindObjectOfType<SBM.UI.Components.UIPlayerRoster>().ConfigureCoopPlayersForNetworkPlay();
+            });
+        }
+
+        // loop through ALL players instead of just first 2 for coop
+        [HarmonyPatch(typeof(SBM.UI.Components.UIPlayerRoster), "ConfigureCoopPlayersForNetworkPlay")]
+        [HarmonyPrefix]
+        public static bool OverrideCoopPlayerProfileCount()
+        {
+            if (NetworkSystem.IsHost)
+            {
+                // Debug.Log("OverrideCoopPlayerProfileCount " + SBM.Shared.PlayerRoster.profiles.Count);
+                // Debug.Log("Network Count " + NetworkSystem.UserCount);
+                var localProfile = SBM.Shared.PlayerRoster.GetProfile(1);
+                NetworkUserId localUserId = NetworkSystem.LocalUserId;
+                string localUsername = NetworkSystem.LocalUsername;
+                localProfile.Overwrite(0, 0, SBM.Shared.Team.Red, localUserId, true, localUsername);
+
+                for (int i = 1; i < NetworkSystem.UserCount; i++)
+                {
+                    // register profile here ? (if network.usercount is accurate)
+                    SBM.Shared.PlayerRoster.Deregister(i + 1);
+                    SBM.Shared.PlayerRoster.RegisterRemotePlayer(i + 1, 0, 0, NetworkSystem.instance.users[i].Id);
+                    var remoteProfile1 = SBM.Shared.PlayerRoster.GetProfile(i + 1);
+
+                    NetworkUserId remoteUserId1 = NetworkSystem.GetRemoteUserId(i - 1); // i - 1, since this should start at 1 (first remote user)
+                    string remoteUsername1 = NetworkSystem.GetUsername(remoteUserId1);
+                    Debug.Log(remoteUsername1);
+                    Debug.Log(remoteUserId1);
+                    remoteProfile1.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId1, false, remoteUsername1);
+                }
+            }
+
+            return false;
+        }
+
+        // ensure that gamemanager properly spawns all players, regardless of actual player spawn count
+        [HarmonyPatch(typeof(SBM.Shared.GameManager), "RespawnAllPlayers")]
+        [HarmonyPrefix]
+        static bool OverridePlayerRespawn(SBM.Shared.GameManager __instance)
+        {
+            for (int i = 0; i < SBM.Shared.Player.Count; i++)
+            {
+                SBM.Shared.Player.GetByIndex(i).SetVisible(false);
+            }
+
+            // GameManager.ReorderSpawnPoints(List<Vector3> output) *NON-OVERRIDE*
+            __instance.spawnPoints.Clear();
+            for (int i = 0; i < SBM.Shared.PlayerSpawnPoint.Count; i++)
+            {
+                Vector3 byIndex = SBM.Shared.PlayerSpawnPoint.GetByIndex(i);
+                __instance.spawnPoints.Add(byIndex);
+            }
+            var state = UnityEngine.Random.state;
+            UnityEngine.Random.InitState(__instance.ResetCount);
+            Catobyte.Utilities.ExtensionMethods.Shuffle(__instance.spawnPoints);
+            UnityEngine.Random.state = state;
+            // end
+
+            Debug.Log("Spawn Count: " + __instance.spawnPoints.Count);
+
+            for (int j = 0; j < SBM.Shared.PlayerRoster.Profiles.Count; j++)
+            {
+                SBM.Shared.Player byNumber = SBM.Shared.Player.GetByNumber(SBM.Shared.PlayerRoster.GetPlayerNumber(j));
+
+                if (byNumber != null)
+                {
+                    if (j >= __instance.spawnPoints.Count)
+                    {
+                        Vector3 lastSpawnPoint = __instance.spawnPoints.Last();
+
+                        byNumber.SpawnPoint = new Vector3(lastSpawnPoint.x + j, lastSpawnPoint.y, lastSpawnPoint.z);
+                        byNumber.Respawn();
+
+                        continue;
+                    }
+
+                    byNumber.SpawnPoint = __instance.spawnPoints[j];
+                    byNumber.Respawn();
+                }
+            }
+
+            return false;
+        }
+
         // change the SceneState, since CurrentSceneIndex is only set when a new scene is loaded based on that scene's build index.
         // scenes loaded through asset bundles (like the 'base level') are not registered in the build settings, and therefore have a
         // build index of -1, a value which will not be properly sent through the existing SceneData packets.
@@ -199,9 +534,6 @@ namespace SBM_CustomLevels
 
             // determine if custom level, Scene buildIndex of -1 means it was loaded via assetbundle, meaning a custom level.
             // so method should continue as players are (almost certainly) in the same client scenes.
-
-            //Debug.Log("Current Scene Index: " + SBM.Shared.SceneSystem.CurrentScene.buildIndex);
-            //Debug.Log("Player Scene Index: " + (int)playersData.SceneIndex);
 
             if ((int)playersData.SceneIndex != SBM.Shared.SceneSystem.CurrentScene.buildIndex)
             {
@@ -428,17 +760,21 @@ namespace SBM_CustomLevels
             public ulong world;
             // integer identifier of level within a world 0-9 for the 10 levels (max) that exist in a world
             public ushort level;
+            // integer identifier for type of level (using enum LevelManager.LevelType)
+            public ushort levelType;
 
             public override void Serialize(ISerializer ser)
             {
                 ser.Write(world);
                 ser.Write(level);
+                ser.Write(levelType);
             }
 
             public override void Deserialize(IDeserializer deser)
             {
                 this.world = deser.Read<ulong>();
                 this.level = deser.Read<ushort>();
+                this.levelType = deser.Read<ushort>();
             }
         }
     }

@@ -3,7 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Objects
 {
     // creates a "node" handle along the SplineMaker spline (at anchor points) to allow user to click and edit the spline in the SBM editor
     // specifically for working with the <<TubeRenderer>> package ----> SplineMakerHelper 

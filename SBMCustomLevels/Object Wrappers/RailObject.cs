@@ -4,8 +4,9 @@ using SplineMesh;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
+using SBM_CustomLevels.Objects;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
     [Serializable]
     public class RailObject : DefaultObject
@@ -20,6 +21,8 @@ namespace SBM_CustomLevels
 
         public RailObject(GameObject gameObject) : base(gameObject)
         {
+            objectType = ObjectType.Rail;
+
             // preserve node order
             List<SplineNode> splineNodes = gameObject.GetComponentsInChildren<SplineMeshNodeData>().OrderBy(x => x.nodeID).Select(x => x.node).ToList();
 

@@ -2,7 +2,7 @@
 using UnityEngine;
 using SplineMesh;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Objects
 {
     // creates a "node" handle along the SplineMesh spline to allow user to click and edit the spline in the SBM editor
     // specifically for working with the <<SplineMesh>> package ----> SplineSmoother ----> MinecartRailHelper 

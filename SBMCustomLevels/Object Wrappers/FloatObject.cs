@@ -2,7 +2,7 @@
 using UnityEngine;
 using Newtonsoft.Json;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.ObjectWrappers
 {
     [Serializable]
     public class FloatObject
@@ -20,6 +20,13 @@ namespace SBM_CustomLevels
             position[0] = gameObject.transform.position.x;
             position[1] = gameObject.transform.position.y;
             position[2] = gameObject.transform.position.z;
+        }
+
+        public FloatObject(Vector3 pos)
+        {
+            position[0] = pos.x;
+            position[1] = pos.y;
+            position[2] = pos.z;
         }
 
         public Vector3 GetPosition()

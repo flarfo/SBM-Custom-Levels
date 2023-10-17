@@ -5,19 +5,20 @@ using System.IO;
 using System.Reflection;
 using System.Linq;
 using System.Collections.Generic;
-using System.Collections;
-using System;
+using SBM_CustomLevels.Editor;
+using SBM_CustomLevels.Objects;
 
 namespace SBM_CustomLevels
 {
-    [BepInPlugin("flarfo.sbm.level_loader", "SBM_LevelLoader", "0.0.1")]
+    [BepInPlugin("flarfo.sbm.customlevels", "SBM_CustomLevels", "1.4.0")]
     public class LevelLoader_Mod : BaseUnityPlugin
     {
-        private readonly string pluginGUID = "flarfo.sbm.level_loader";
         private readonly string pluginName = "SBM_LevelLoader";
-        private readonly string pluginVersion = "0.0.1";
 
         public static string levelsPath = Path.Combine(Path.GetDirectoryName(Application.dataPath), "levels");
+        public static string deathmatchPath = Path.Combine(levelsPath, "Deathmatch");
+        public static string basketballPath = Path.Combine(levelsPath, "Basketball");
+        public static string carrotGrabPath = Path.Combine(levelsPath, "Carrot Grab");
 
         public static List<World> worldsList = new List<World>();
 
@@ -44,6 +45,21 @@ namespace SBM_CustomLevels
                 Directory.CreateDirectory(levelsPath);
             }
 
+            if (!Directory.Exists(basketballPath))
+            {
+                Directory.CreateDirectory(basketballPath);
+            }
+
+            if (!Directory.Exists(deathmatchPath))
+            {
+                Directory.CreateDirectory(deathmatchPath);
+            }
+
+            if (!Directory.Exists(carrotGrabPath))
+            {
+                Directory.CreateDirectory(carrotGrabPath);
+            }
+
             UpdateWorldsList();
 
             GameObject levelManager = new GameObject("LevelManager", typeof(LevelManager));
@@ -68,6 +84,7 @@ namespace SBM_CustomLevels
 
             EditorManager.iceSledSpikesGuide = sbmBundle.LoadAsset<GameObject>("IceSledSpikesGuide");
             EditorManager.playerSpawn = sbmBundle.LoadAsset<GameObject>("PlayerSpawn");
+
             EditorManager.scaffoldingBlock = sbmBundle.LoadAsset<GameObject>("ScaffoldingBlock");
             EditorManager.scaffoldingCorner = sbmBundle.LoadAsset<GameObject>("ScaffoldingCorner");
             EditorManager.scaffoldPanelBlack = sbmBundle.LoadAsset<GameObject>("ScaffoldPanelBlack");
@@ -75,6 +92,11 @@ namespace SBM_CustomLevels
 
             EditorManager.outlineMask = sbmBundle.LoadAsset<Material>("OutlineMask");
             EditorManager.outlineFill = sbmBundle.LoadAsset<Material>("OutlineFill");
+
+            EditorManager.colorBlock = sbmBundle.LoadAsset<GameObject>("ColorBlock");
+            EditorManager.colorBlockCorner = sbmBundle.LoadAsset<GameObject>("ColorBlockCorner");
+            EditorManager.colorBlock.AddComponent<ColorData>();
+            EditorManager.colorBlockCorner.AddComponent<ColorData>();
 
             MinecartRailHelper.railSplineTile = sbmBundle.LoadAsset<Mesh>("RailSplineTile");
             MinecartRailHelper.railMaterial = sbmBundle.LoadAsset<Material>("MinecartRail");
@@ -84,6 +106,11 @@ namespace SBM_CustomLevels
             SplineMakerHelper.splineMaterial = sbmBundle.LoadAsset<Material>("ScaffoldPlatform");
 
             sbmBundle.Unload(false);
+
+            EditorManager.playerSpawn.layer = 5; // UI layer for no collision
+            MinecartRailHelper.railNodeHandle.layer = 5; // UI layer for no collision
+            SplineMakerHelper.splineNodeHandle.layer = 5; // UI layer for no collision
+            Physics.IgnoreLayerCollision(5, 0);
         }
         
         public static void UpdateWorldsList()
@@ -92,6 +119,8 @@ namespace SBM_CustomLevels
 
             int count = 0;
 
+            List<World> tempWorlds = new List<World>();
+
             // order by creation time, a bad partial fix for alphabetical not being consistent when new worlds added
             foreach (string worldPath in Directory.GetDirectories(levelsPath).OrderBy(p => new DirectoryInfo(p).CreationTime))
             {
@@ -99,14 +128,23 @@ namespace SBM_CustomLevels
                 {
                     break;
                 }
-
-                //List<string> levels = Directory.GetFiles(world, "*.sbm").ToList();
+                
                 string worldName = new DirectoryInfo(worldPath).Name;
+
+                if (worldName == "Deathmatch" || worldName == "Basketball" || worldName == "Carrot Grab")
+                {
+                    tempWorlds.Add(new World(worldName));
+                    count++;
+                    continue;
+                }
 
                 worldsList.Add(new World(worldName));
 
                 count++;
             }
+
+            // make sure party levels are always at the end
+            worldsList.AddRange(tempWorlds);
         }
 
         /// <summary>
@@ -153,7 +191,7 @@ namespace SBM_CustomLevels
 
     public sealed class World
     {
-        public List<string> levels = new List<string>();
+        public List<Level> levels = new List<Level>();
         public string worldPath;
 
         private string _name;
@@ -184,9 +222,19 @@ namespace SBM_CustomLevels
 
         public void UpdateLevels()
         {
+            levels.Clear();
+
             if (Directory.Exists(worldPath))
             {
-                levels = Directory.GetFiles(worldPath, "*.sbm").ToList();
+                foreach (var dir in Directory.GetFiles(worldPath, "*.sbm"))
+                {
+                    string fileName = Path.GetFileNameWithoutExtension(dir);
+
+                    if (ulong.TryParse(fileName, out ulong result))
+                    {
+                        levels.Add(new Level(dir, result));
+                    }
+                }
             }
         }
 
@@ -288,6 +336,18 @@ namespace SBM_CustomLevels
             }
             
             return final;
+        }
+    }
+
+    public sealed class Level
+    {
+        public string levelPath;
+        public ulong levelHash;
+
+        public Level(string _levelPath, ulong _levelHash = 0)
+        {
+            levelPath = _levelPath;
+            levelHash = _levelHash;
         }
     }
 }

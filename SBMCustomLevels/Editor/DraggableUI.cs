@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.EventSystems;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Editor
 {
     public class DraggableUI: MonoBehaviour, IPointerDownHandler, IEventSystemHandler, IPointerUpHandler
 	{

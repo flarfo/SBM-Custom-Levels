@@ -2,7 +2,7 @@
 using System.Collections;
 using UnityEngine;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Editor
 {
     public class EditorSelectable : MonoBehaviour
     {
@@ -33,6 +33,8 @@ namespace SBM_CustomLevels
             }
         }
 
+        public bool isChild = false;
+
         public Outline outline;
 
         Vector3 mouseOffset;
@@ -51,6 +53,8 @@ namespace SBM_CustomLevels
             outline.OutlineWidth = 2f;
 
             outline.enabled = false;
+
+            //id = EditorManager.NextID;
         }
 
         void OnEnable()
@@ -80,7 +84,7 @@ namespace SBM_CustomLevels
 
             if (EditorManager.instance.snapEnabled)
             {
-                Vector2 snappedPos = new Vector3();
+                Vector2 snappedPos = new Vector2();
 
                 if (snapVector.x == 0)
                 {

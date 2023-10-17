@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.Events;
-using SplineMesh;
 using System.IO;
 using System.Collections.Generic;
 using UnityEngine.EventSystems;
 using Newtonsoft.Json;
+using SBM_CustomLevels.Objects;
+using SBM_CustomLevels.ObjectWrappers;
+using SBM_CustomLevels.Extensions;
 
-namespace SBM_CustomLevels
+namespace SBM_CustomLevels.Editor
 {
     internal class EditorManager : MonoBehaviour
     {
@@ -24,12 +25,71 @@ namespace SBM_CustomLevels
         public static GameObject scaffoldingCorner;
         public static GameObject scaffoldPanelBlack;
         public static GameObject scaffoldPanelBrown;
+        public static GameObject colorBlock;
+        public static GameObject colorBlockCorner;
 
         public List<EditorSelectable> selectableObjects = new List<EditorSelectable>();
 
         public GameObject background;
 
-        public static bool inEditor = false;
+        private static bool inEditor = false;
+        private bool testing = false;
+
+        public bool settingParent = false;
+
+        public bool Testing 
+        {
+            get
+            {
+                return testing;
+            }
+            set
+            {
+                testing = value;
+
+                Physics.autoSimulation = value;
+
+                if (value)
+                {
+                    // spawn player
+                    if (SBM.Shared.PlayerRoster.profiles.Count < 1)
+                    {
+                        SBM.Shared.PlayerRoster.RegisterLocalPlayer(1, 0);
+                    }
+
+                    // update ALL WorldResettables, so that reset position is updated after being moved
+                    var resettables = GameObject.FindObjectsOfType<SBM.Shared.Utilities.ResettableTransform>();
+                    for  (int i = 0; i < resettables.Length; i++)
+                    {
+                        resettables[i].transformRecord = new Catobyte.Utilities.TransformRecord(resettables[i].gameObject.transform);
+                    }
+
+                    SBM.Shared.Player.RegenerateAll();
+                    SBM.Shared.Cameras.TrackingCamera.ScheduleCenterOnTargets();
+                }
+                else
+                {
+                    // destroy player
+                    if (EditorManager.InEditor)
+                    {
+                        var byNumber = SBM.Shared.Player.GetByNumber(1).gameObject;
+
+                        if (byNumber)
+                        {
+                            Destroy(byNumber);
+                        }
+                    }
+                }
+
+                if (EditorManager.InEditor)
+                {
+                    SBM.Shared.WorldResetHandler.ScanForResettables();
+                    SBM.Shared.GameManager.Instance.ResetRound(false, 0f);
+                }
+            }
+        }
+
+        public bool testingPaused = false;
 
         public string selectedLevel;
 
@@ -59,8 +119,7 @@ namespace SBM_CustomLevels
         public GameObject carrot;
 
         public GameObject wormhole;
-        public GameObject spawn1;
-        public GameObject spawn2;
+        public GameObject[] spawns = new GameObject[4];
 
         public static bool InEditor 
         {
@@ -75,6 +134,9 @@ namespace SBM_CustomLevels
                 OnEditor(value);
             } 
         }
+
+        private List<EditorSelectable> lastRaycasts = new List<EditorSelectable>();
+        private int lastRayIndex = 0;
 
         //currently selected objects
         public List<EditorSelectable> curSelected = new List<EditorSelectable>();
@@ -101,7 +163,7 @@ namespace SBM_CustomLevels
 
         private void Update()
         {
-            if (!inEditor || !editorUI)
+            if (!InEditor || !editorUI)
             {
                 return;
             }
@@ -282,17 +344,6 @@ namespace SBM_CustomLevels
                 curSelected.Clear();
             }
 
-            // move ghostItem with mouse cursor
-            if (ghostItem)
-            {
-                ghostItem.MoveObjectToMouse(snapVector);
-
-                if (stampTool)
-                {
-                    ghostItem.SetInspectorInfo(true, false, false);
-                }
-            }
-
             // if pointer is over UI, no need to check 3D world for input
             if (EventSystem.current.IsPointerOverGameObject())
             {
@@ -309,16 +360,15 @@ namespace SBM_CustomLevels
             {
                 if (selectTool)
                 {
+                    settingParent = false;
+
                     foreach (EditorSelectable selectable in curSelected)
                     {
                         selectable.Selected = false;
                     }
 
                     curSelected.Clear();
-                    EditorUI.instance.EnableInspector(false);
-                    EditorUI.instance.EnableObjSettingsUI(false);
-                    EditorUI.instance.EnableRailUI(false);
-                    EditorUI.instance.EnableWaterUI(false);
+                    EditorUI.instance.DisableOtherUIs(inspector: false);
                 }
             }
 
@@ -330,7 +380,7 @@ namespace SBM_CustomLevels
                     UndoManager.AddUndo(UndoManager.UndoType.Move, new List<EditorSelectable>(curSelected));
                 }
 
-                if (selectTool)
+                if (selectTool || settingParent)
                 {
                     selectedUI = false;
 
@@ -372,6 +422,17 @@ namespace SBM_CustomLevels
                     }
 
                     return;
+                }
+            }
+
+            // move ghostItem with mouse cursor
+            if (ghostItem)
+            {
+                ghostItem.MoveObjectToMouse(snapVector);
+
+                if (stampTool)
+                {
+                    ghostItem.SetInspectorInfo(true, false, false);
                 }
             }
 
@@ -446,25 +507,69 @@ namespace SBM_CustomLevels
         private void SelectObject(bool ctrlClicked)
         {
             //raycast to select object EDITORSELECATBLE
-            RaycastHit hit;
+            EditorSelectable hitSelectable = null;
 
             Ray ray = editorCamera.ScreenPointToRay(Input.mousePosition);
+            RaycastHit[] rHits = Physics.RaycastAll(ray);
 
-            if (Physics.Raycast(ray, out hit))
+            if (rHits.Length > 0)
             {
-                EditorSelectable hitSelectable;
+                // sort raycasts by distance of detected object
+                Array.Sort(rHits, (a, b) => a.distance.CompareTo(b.distance));
+                List<EditorSelectable> hits = new List<EditorSelectable>();
 
-                if (hit.collider.transform.root && !hit.collider.gameObject.name.Contains("Node"))
+                for (int i = 0; i < rHits.Length; i++)
                 {
-                    hitSelectable = hit.collider.transform.root.GetComponent<EditorSelectable>();
+                    if (rHits[i].collider.transform.TryGetComponent(out EditorSelectable s))
+                    {
+                        hits.Add(s);
+                    }
+                    else if (rHits[i].transform.TryGetComponent(out EditorSelectable s1))
+                    {
+                        hits.Add(s1);
+                    }
+                    else if (rHits[i].transform.root)
+                    {
+                        // ensure selection of objects even if root object doesnt have a collider
+                        if (rHits[i].transform.root.TryGetComponent(out EditorSelectable s2))
+                        {
+                            hits.Add(s2);
+                        }
+                    }
+                }
+
+                // remove copies of editor selectables (can occur if an object has children that also have colliders)
+                hits = hits.Distinct().ToList();
+
+                if (Enumerable.SequenceEqual(hits, lastRaycasts) && lastRayIndex < hits.Count - 1)
+                {
+                    hitSelectable = hits[lastRayIndex + 1];
+                    lastRayIndex += 1;
+                }
+                else if (hits.Count > 0)
+                {
+                    hitSelectable = hits[0];
+                    lastRayIndex = 0;
                 }
                 else
                 {
-                    hitSelectable = hit.collider.GetComponent<EditorSelectable>();
+                    lastRayIndex = 0;
                 }
-                
-                if (!hitSelectable)
+
+                lastRaycasts = hits;
+            }
+
+            if (hitSelectable)
+            {
+                if (settingParent)
                 {
+                    foreach (var selectable in curSelected)
+                    {
+                        selectable.transform.parent = hitSelectable.transform;
+                        selectable.isChild = true;
+                    }
+
+                    settingParent = false;
                     return;
                 }
 
@@ -473,6 +578,7 @@ namespace SBM_CustomLevels
                 bool activateSplineUI = false;
                 bool activatePistonUI = false;
                 bool activateObjSettingsUI = false;
+                bool activateColorUI = false;
 
                 //check if water/minecart/flipblock etc to enable custom UI
                 if (hitSelectable.GetComponent<WaterDataContainer>())
@@ -496,6 +602,10 @@ namespace SBM_CustomLevels
                 {
                     activateObjSettingsUI = true;
                 }
+                else if (hitSelectable.GetComponent<ColorData>())
+                {
+                    activateColorUI = true;
+                }
 
                 //if control pressed, already selected objects will be deselected, nonselected objects will be appended to selection
                 if (ctrlClicked)
@@ -512,6 +622,7 @@ namespace SBM_CustomLevels
                             EditorUI.instance.EnablePistonUI(false);
                             EditorUI.instance.EnableRailUI(false);
                             EditorUI.instance.EnableObjSettingsUI(false);
+                            EditorUI.instance.EnableColorUI(false);
 
                             EditorUI.instance.curWater = null;
                             EditorUI.instance.curPiston = null;
@@ -559,6 +670,12 @@ namespace SBM_CustomLevels
                     {
                         EditorUI.instance.EnableObjSettingsUI(true);
                         EditorUI.instance.SetObjSettingsInformation(hitSelectable.gameObject);
+                    }
+
+                    if (activateColorUI)
+                    {
+                        EditorUI.instance.EnableColorUI(true);
+                        EditorUI.instance.SetColorInformation(hitSelectable.gameObject);
                     }
 
                     return;
@@ -621,12 +738,18 @@ namespace SBM_CustomLevels
                     EditorUI.instance.SetObjSettingsInformation(hitSelectable.gameObject);
                 }
 
+                if (activateColorUI)
+                {
+                    EditorUI.instance.SetColorInformation(hitSelectable.gameObject);
+                }
+
                 EditorUI.instance.EnableInspector(true);
                 EditorUI.instance.EnableWaterUI(activateWaterUI);
                 EditorUI.instance.EnablePistonUI(activatePistonUI);
                 EditorUI.instance.EnableRailUI(activateRailUI);
                 EditorUI.instance.EnableSplineUI(activateSplineUI);
                 EditorUI.instance.EnableObjSettingsUI(activateObjSettingsUI);
+                EditorUI.instance.EnableColorUI(activateColorUI);
             }
         }
 
@@ -672,9 +795,10 @@ namespace SBM_CustomLevels
         {
             Debug.Log("Editor reset!");
             InEditor = false;
+            Testing = false;
+            testingPaused = false;
             wormhole = null;
-            spawn1 = null;
-            spawn2 = null;
+            spawns = new GameObject[4];
             selectedLevel = null;
             curSelected = new List<EditorSelectable>();
             selectableObjects = new List<EditorSelectable>();
@@ -685,13 +809,16 @@ namespace SBM_CustomLevels
             selectTool = false;
             mouseUp = false;
             background = null;
+            lastRaycasts = new List<EditorSelectable>();
+            lastRayIndex = 0;
             worldStyle = 1;
 
             UndoManager.Reset();
         }
 
-        //loads EXISTING level in editor mode
-        public static void LoadEditorLevel(string path)
+
+        // determine which method to use to load level, if legacy or new
+        public static void SetupLoadEditorLevel(string path)
         {
             InEditor = true;
 
@@ -706,15 +833,58 @@ namespace SBM_CustomLevels
             }
 
             string rawText = File.ReadAllText(path);
-            instance.worldStyle = (int)char.GetNumericValue(rawText[0]);
-            rawText = rawText.Remove(0, 1);
 
-            instance.background = LevelManager.instance.CreateBackground(instance.worldStyle);
+            try
+            {
+                JSONObjectContainer json = JsonConvert.DeserializeObject<JSONObjectContainer>(rawText);
+                string version = json.Version;
 
-            ObjectContainer json = JsonConvert.DeserializeObject<ObjectContainer>(rawText);
+                // to determine style of loading for later incompatibilities: 
+                switch (version) 
+                {
+                    case "1.4":
+                        LoadEditorLevel(json);
+                        break;
+                    default:
+                        LoadEditorLevel(json);
+                        break;
+                }
+            }
+            catch
+            {
+                Debug.LogError("Legacy level loaded! Reverting to old loading method...");
 
+                instance.worldStyle = (int)char.GetNumericValue(rawText[0]);
+                rawText = rawText.Remove(0, 1);
+
+                LegacyJSONObjectContainer json = JsonConvert.DeserializeObject<LegacyJSONObjectContainer>(rawText);
+                LoadEditorLevelLegacy(json);
+            }
+        }
+
+        // New loading - version 1.4 and later
+        public static void LoadEditorLevel(JSONObjectContainer json)
+        {
+            instance.background = LevelManager.instance.CreateBackground(json.worldType);
+            instance.worldStyle = json.worldType;
+
+            foreach (var objPair in json.objects)
+            {
+                var obj = objPair.Value;
+
+                if (obj.isChild)
+                {
+                    continue;
+                }
+
+                SpawnObject(obj, json.objects, isEditor: true);
+            }
+
+            #region Spawns
             Vector3 spawnPos_1;
             Vector3 spawnPos_2;
+            Vector3 spawnPos_3;
+            Vector3 spawnPos_4;
 
             try
             {
@@ -735,7 +905,467 @@ namespace SBM_CustomLevels
                 Debug.LogError("Missing spawnPos_2 in json! Setting to (1,0,0).");
                 spawnPos_2 = new Vector3(1, 0, 0);
             }
-            
+
+            try
+            {
+                spawnPos_3 = json.spawnPosition3.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_3 in json! Setting to NULL.");
+                spawnPos_3 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
+
+            try
+            {
+                spawnPos_4 = json.spawnPosition4.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_4 in json! Setting to NULL.");
+                spawnPos_4 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
+
+            GameObject playerSpawn_1 = Instantiate(playerSpawn);
+            playerSpawn_1.name = "PlayerSpawn_1";
+            playerSpawn_1.transform.position = spawnPos_1;
+            playerSpawn_1.transform.localScale = new Vector3(1, 2, 1);
+            playerSpawn_1.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+            playerSpawn_1.AddComponent<Outline>();
+            playerSpawn_1.AddComponent<EditorSelectable>();
+            instance.spawns[0] = playerSpawn_1;
+
+            GameObject playerSpawn_2 = Instantiate(playerSpawn);
+            playerSpawn_2.name = "PlayerSpawn_2";
+            playerSpawn_2.transform.position = spawnPos_2;
+            playerSpawn_2.transform.localScale = new Vector3(1, 2, 1);
+            playerSpawn_2.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+            playerSpawn_2.AddComponent<Outline>();
+            playerSpawn_2.AddComponent<EditorSelectable>();
+            instance.spawns[1] = playerSpawn_2;
+
+            if (spawnPos_3 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_3 = Instantiate(playerSpawn);
+                playerSpawn_3.name = "PlayerSpawn_3";
+                playerSpawn_3.transform.position = spawnPos_3;
+                playerSpawn_3.transform.localScale = new Vector3(1, 2, 1);
+                playerSpawn_3.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+                playerSpawn_3.AddComponent<Outline>();
+                playerSpawn_3.AddComponent<EditorSelectable>();
+                instance.spawns[2] = playerSpawn_3;
+            }
+
+            if (spawnPos_4 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_4 = Instantiate(playerSpawn);
+                playerSpawn_4.name = "PlayerSpawn_4";
+                playerSpawn_4.transform.position = spawnPos_4;
+                playerSpawn_4.transform.localScale = new Vector3(1, 2, 1);
+                playerSpawn_4.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+                playerSpawn_4.AddComponent<Outline>();
+                playerSpawn_4.AddComponent<EditorSelectable>();
+                instance.spawns[3] = playerSpawn_4;
+            }
+            #endregion
+        }
+
+        public static GameObject SpawnObject(DefaultObject obj, Dictionary<int, DefaultObject> objects, Transform parent = null, bool isEditor = false)
+        {
+            GameObject loadedObject;
+
+            switch (obj.objectType)
+            {
+                case ObjectType.Default:
+                    // certain objects need to be recreated from a dummy object, loaded by bundle
+                    if (obj.objectName == "prefabs\\level\\world2\\IceSledSpikesGuide")
+                    {
+                        if (isEditor)
+                        {
+                            loadedObject = Instantiate(iceSledSpikesGuide, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+                        }
+                        else
+                        {
+                            loadedObject = Instantiate(Resources.Load(obj.objectName) as GameObject, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+                        }
+                    }
+                    // certain objects have no meshrenderer, must be added with material for colors
+                    else if (obj.objectName == "prefabs\\level\\KillBounds")
+                    {
+                        loadedObject = Instantiate(Resources.Load(obj.objectName) as GameObject, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+
+                        if (isEditor)
+                        {
+                            Material mat = new Material(Shader.Find("Standard"));
+                            mat.color = new Color32(255, 0, 0, 128);
+
+                            // for transparency
+                            mat.SetFloat("_Mode", 3);
+                            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                            mat.EnableKeyword("_ALPHABLEND_ON");
+                            mat.renderQueue = 3000;
+
+                            loadedObject.AddComponent<MeshRenderer>().material = mat;
+                        }
+                    }
+                    else if (obj.objectName == "prefabs\\level\\world3\\BoulderDestroyer")
+                    {
+                        loadedObject = Instantiate(Resources.Load(obj.objectName) as GameObject, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+
+                        if (isEditor)
+                        {
+                            Material mat = new Material(Shader.Find("Standard"));
+                            mat.color = new Color32(128, 0, 0, 128);
+
+                            // for transparency
+                            mat.SetFloat("_Mode", 3);
+                            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                            mat.EnableKeyword("_ALPHABLEND_ON");
+                            mat.renderQueue = 3000;
+
+                            loadedObject.AddComponent<MeshRenderer>().material = mat;
+                        }
+                    }
+                    else if (obj.objectName == "ScaffoldingBlock")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldingBlock, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+                    }
+                    else if (obj.objectName == "ScaffoldingCorner")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldingCorner, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+                    }
+                    else if (obj.objectName == "ScaffoldPanelBlack")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldPanelBlack, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+                    }
+                    else if (obj.objectName == "ScaffoldPanelBrown")
+                    {
+                        loadedObject = Instantiate(EditorManager.scaffoldPanelBrown, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+                    }
+                    else
+                    {
+                        loadedObject = Instantiate(Resources.Load(obj.objectName) as GameObject, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+                    }
+
+                    loadedObject.transform.localScale = obj.GetScale();
+
+                    if (isEditor)
+                    {
+                        if (obj.objectName == "prefabs\\level\\Carrot")
+                        {
+                            instance.carrot = loadedObject;
+                        }
+                        else if (obj.objectName == "prefabs\\level\\Wormhole")
+                        {
+                            instance.wormhole = loadedObject;
+                        }
+
+                        AddColliderToObject(loadedObject);
+
+                        if (loadedObject.layer == 10)
+                        {
+                            loadedObject.layer = 0;
+                        }
+                    }
+
+                    break;
+                case ObjectType.ColorBlock:
+                    ColorBlockObject colorBlockObject = obj as ColorBlockObject;
+
+                    if (colorBlockObject.isCorner)
+                    {
+                        loadedObject = Instantiate(colorBlockCorner, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+                    else
+                    {
+                        loadedObject = Instantiate(colorBlock, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+
+                    Color32 color = new Color32((byte)colorBlockObject.r, (byte)colorBlockObject.g, (byte)colorBlockObject.b, 255);
+
+                    ColorData colorData = loadedObject.GetComponent<ColorData>();
+                    colorData.color = color;
+
+                    loadedObject.transform.localScale = colorBlockObject.GetScale();
+                    loadedObject.GetComponent<MeshRenderer>().material.color = color;
+                    break;
+                case ObjectType.FlipBlock:
+                    FlipBlockObject flipBlockObject = obj as FlipBlockObject;
+                    loadedObject = Instantiate(Resources.Load(flipBlockObject.objectName) as GameObject, flipBlockObject.GetPosition(), Quaternion.Euler(flipBlockObject.GetRotation()));
+
+                    if (isEditor)
+                    {
+                        MeshSliceData meshDataFlip = loadedObject.transform.root.gameObject.AddComponent<MeshSliceData>();
+                        meshDataFlip.width = flipBlockObject.meshWidth;
+                        meshDataFlip.height = flipBlockObject.meshHeight;
+                        meshDataFlip.depth = flipBlockObject.meshDepth;
+                    }
+                    
+                    Vector3 meshSizeFlip = new Vector3(flipBlockObject.meshWidth, flipBlockObject.meshHeight, flipBlockObject.meshDepth);
+
+                    var flipBlock = loadedObject.GetComponent<SBM.Objects.World5.FlipBlock>();
+                    flipBlock.spikesEnabled = flipBlockObject.spikesEnabled;
+
+                    for (int i = 0; i < flipBlock.spikesEnabled.Length; i++)
+                    {
+                        flipBlock.spikesEnabled = flipBlockObject.spikesEnabled;
+                        flipBlock.spikes[i].SetActive(flipBlock.spikesEnabled[i]);
+                    }
+
+                    for (int i = 0; i < flipBlock.spikes.Length; i++)
+                    {
+                        // oscillate between 0, 1, 0, -1 using Sin to determine the x position of the current spike, where 1 = right, -1 = left
+                        int xDir = (int)Math.Sin((Math.PI * i) / 2); // 0 1 0 -1
+                        int yDir = (int)Math.Cos((Math.PI * i) / 2); // 1 0 -1 0
+
+                        GameObject curSpike = flipBlock.spikes[i];
+                        curSpike.transform.localPosition = new Vector3((xDir * flipBlockObject.meshWidth) / 2, (yDir * flipBlockObject.meshHeight) / 2, curSpike.transform.localPosition.z);
+                    }
+
+                    flipBlock.timeBetweenFlips = flipBlockObject.flipTime;
+                    flipBlock.degreesPerFlip = flipBlockObject.flipDegrees;
+                    flipBlock.direction = flipBlockObject.direction ? SBM.Objects.World5.FlipBlock.FlipDirection.Right : SBM.Objects.World5.FlipBlock.FlipDirection.Left;
+
+                    var meshSliceFlip = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+                    meshSliceFlip.Size = meshSizeFlip;
+                    meshSliceFlip.Regenerate();
+                    break;
+                case ObjectType.MeshSlice:
+                    MeshSliceObject meshSliceObject = obj as MeshSliceObject;
+                    var mObj = Instantiate(Resources.Load(meshSliceObject.objectName) as GameObject, meshSliceObject.GetPosition(), Quaternion.Euler(meshSliceObject.GetRotation())).GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                    if (isEditor)
+                    {
+                        MeshSliceData meshDataSlice = mObj.transform.root.gameObject.AddComponent<MeshSliceData>();
+                        meshDataSlice.width = meshSliceObject.meshWidth;
+                        meshDataSlice.height = meshSliceObject.meshHeight;
+                        meshDataSlice.depth = meshSliceObject.meshDepth;
+                    }
+
+                    mObj.Size = new Vector3(meshSliceObject.meshWidth, meshSliceObject.meshHeight, meshSliceObject.meshDepth);
+                    mObj.Regenerate();
+                    
+                    if (meshSliceObject.objectName.Contains("SlipNSlide"))
+                    {
+                        var colliderSizers = mObj.GetComponentsInChildren<Catobyte.Utilities.BoxColliderAutoSizer>();
+                        foreach (var sizer in colliderSizers)
+                        {
+                            sizer.ResizeBoxCollider();
+                        }
+
+                        var edgeRail1 = mObj.transform.GetChild(1);
+                        edgeRail1.localScale = new Vector3(edgeRail1.localScale.x, meshSliceObject.meshWidth, edgeRail1.localScale.y);
+                        edgeRail1.localPosition = new Vector3(-0.5f * meshSliceObject.meshWidth, edgeRail1.localPosition.y, edgeRail1.localPosition.z);
+
+                        var edgeRail2 = mObj.transform.GetChild(2);
+                        edgeRail2.localScale = new Vector3(edgeRail2.localScale.x, meshSliceObject.meshWidth, edgeRail2.localScale.y);
+                        edgeRail2.localPosition = new Vector3(-0.5f * meshSliceObject.meshWidth, edgeRail2.localPosition.y, edgeRail2.localPosition.z);
+                    }
+                    
+                    loadedObject = mObj.transform.root.gameObject;
+                    break;
+                case ObjectType.Piston:
+                    PistonObject pistonObject = obj as PistonObject;
+                    loadedObject = Instantiate(Resources.Load(pistonObject.objectName) as GameObject, pistonObject.GetPosition(), Quaternion.Euler(pistonObject.GetRotation()));
+
+                    if (isEditor)
+                    {
+                        MeshSliceData meshDataPiston = loadedObject.transform.root.gameObject.AddComponent<MeshSliceData>();
+                        meshDataPiston.width = pistonObject.meshWidth;
+                        meshDataPiston.height = pistonObject.meshHeight;
+                        meshDataPiston.depth = pistonObject.meshDepth;
+                    }
+
+                    Vector3 meshSizePiston = new Vector3(pistonObject.meshWidth, pistonObject.meshHeight, pistonObject.meshDepth);
+
+                    var pistonPlatform = loadedObject.GetComponent<SBM.Objects.World5.PistonPlatform>();
+                    pistonPlatform.pistonMaxTravel = pistonObject.pistonMaxTravel;
+                    pistonPlatform.extraShaftLength = pistonObject.pistonShaftLength;
+
+                    PistonDataContainer pistonData = loadedObject.AddComponent<PistonDataContainer>();
+                    pistonData.keyframes = pistonObject.keyframes;
+
+                    pistonPlatform.regenerateNow = true;
+                    pistonPlatform.OnValidate();
+
+                    var meshSlicePiston = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+                    meshSlicePiston.Size = meshSizePiston;
+                    meshSlicePiston.Regenerate();
+                    break;
+                case ObjectType.Rail:
+                    RailObject railObject = obj as RailObject;
+                    loadedObject = MinecartRailHelper.CreateRailFromObject(railObject, isEditor);
+                    break;
+                case ObjectType.SeeSaw:
+                    SeeSawObject seeSawObject = obj as SeeSawObject;
+                    loadedObject = Instantiate(Resources.Load(seeSawObject.objectName) as GameObject, seeSawObject.GetPosition(), Quaternion.Euler(seeSawObject.GetRotation()));
+                    Catobyte.Utilities.MeshSliceAndStretch meshSliceSaw = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                    if (isEditor)
+                    {
+                        MeshSliceData meshDataSaw = loadedObject.transform.root.gameObject.AddComponent<MeshSliceData>();
+                        meshDataSaw.width = seeSawObject.meshWidth;
+                        meshDataSaw.height = seeSawObject.meshHeight;
+                        meshDataSaw.depth = seeSawObject.meshDepth;
+                    }
+
+                    Vector3 size = new Vector3(seeSawObject.meshWidth, seeSawObject.meshHeight, seeSawObject.meshDepth);
+                    meshSliceSaw.Size = size;
+                    meshSliceSaw.Regenerate();
+
+                    var seeSaw = loadedObject.GetComponent<SBM.Objects.World5.SeeSaw>();
+                    seeSaw.platformSize = size;
+                    seeSaw.Regenerate();
+
+                    var pivotJoint = seeSaw.cj;
+                    pivotJoint.anchor = new Vector3(seeSawObject.pivotPos[0], seeSawObject.pivotPos[1], seeSawObject.pivotPos[2]);
+
+                    if (isEditor)
+                    {
+                        var node = PivotNodeHelper.CreatePivotNode(loadedObject.transform);
+                        node.pivotToMove = pivotJoint;
+                        node.transform.localPosition = new Vector3(seeSawObject.pivotPos[0], seeSawObject.pivotPos[1], seeSawObject.pivotPos[2]);
+                    }
+                    
+                    break;
+                case ObjectType.Spline:
+                    SplineObject splineObject = obj as SplineObject;
+                    loadedObject = SplineMakerHelper.CreateSplineFromObject(splineObject, true);
+                    break;
+                case ObjectType.Water:
+                    WaterObject waterObject = obj as WaterObject;
+                    if (waterObject.w5)
+                    {
+                        Catobyte.Utilities.MeshSliceAndStretch loadedMeshSlice;
+                        loadedMeshSlice = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                        Destroy(loadedMeshSlice.transform.root.Find("Water_W5").gameObject);
+
+                        WaterDataContainer fakeWaterTank = loadedMeshSlice.transform.root.gameObject.AddComponent<WaterDataContainer>();
+
+                        fakeWaterTank.w5 = true;
+                        fakeWaterTank.width = waterObject.waterWidth;
+                        fakeWaterTank.height = waterObject.waterHeight;
+                        fakeWaterTank.keyframes = waterObject.keyframes;
+
+                        MeshSliceData meshData = loadedMeshSlice.transform.root.gameObject.AddComponent<MeshSliceData>();
+                        meshData.width = waterObject.waterWidth;
+                        meshData.height = waterObject.waterHeight;
+                        meshData.depth = 1;
+
+                        loadedMeshSlice.Size = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1.15f);
+                        loadedMeshSlice.Regenerate();
+
+                        loadedObject = loadedMeshSlice.transform.root.gameObject;
+
+                        break;
+                    }
+
+                    loadedObject = Instantiate(EditorManager.fakeWater, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation()));
+
+                    loadedObject.transform.localScale = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1);
+
+                    WaterDataContainer fakeWater = loadedObject.GetComponent<WaterDataContainer>();
+                    fakeWater.width = waterObject.waterWidth;
+                    fakeWater.height = waterObject.waterHeight;
+                    fakeWater.keyframes = waterObject.keyframes;
+                    break;
+                default:
+                    loadedObject = Instantiate(Resources.Load(obj.objectName) as GameObject, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
+                    break;
+            }
+
+            if (isEditor)
+            { 
+                loadedObject.AddComponent<Outline>();
+                var selectable = loadedObject.AddComponent<EditorSelectable>();
+
+                if (parent)
+                {
+                    selectable.isChild = true;
+                }
+            }
+
+            // adjust audio of certain objects that is too loud, like wormhole and stalagmites
+            foreach (AudioSource audio in loadedObject.GetComponentsInChildren<AudioSource>())
+            {
+                audio.spatialBlend = 0.75f;
+            }
+
+            if (parent)
+            {
+                loadedObject.transform.parent = parent;
+            }
+
+            loadedObject.transform.localScale = obj.GetScale();
+
+            // spawn all object children, recursive
+            foreach (int child in obj.children)
+            {
+                SpawnObject(objects[child], objects, loadedObject.transform, isEditor: isEditor);
+            }
+
+            return loadedObject;
+        }
+
+        // (Legacy - version 1.3 and earlier) loads EXISTING level in editor mode
+        public static void LoadEditorLevelLegacy(LegacyJSONObjectContainer json)
+        {
+            InEditor = true;
+
+            if (!Directory.Exists(LevelLoader_Mod.levelsPath))
+            {
+                Directory.CreateDirectory(LevelLoader_Mod.levelsPath);
+            }
+
+            instance.background = LevelManager.instance.CreateBackground(instance.worldStyle);
+
+            Vector3 spawnPos_1;
+            Vector3 spawnPos_2;
+            Vector3 spawnPos_3;
+            Vector3 spawnPos_4;
+
+            try
+            {
+                spawnPos_1 = json.spawnPosition1.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_1 in json! Setting to (0,0,0).");
+                spawnPos_1 = new Vector3(0, 0, 0);
+            }
+
+            try
+            {
+                spawnPos_2 = json.spawnPosition2.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_2 in json! Setting to (1,0,0).");
+                spawnPos_2 = new Vector3(1, 0, 0);
+            }
+
+            try
+            {
+                spawnPos_3 = json.spawnPosition3.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_3 in json! Setting to NULL.");
+                spawnPos_3 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
+
+            try
+            {
+                spawnPos_4 = json.spawnPosition4.GetPosition();
+            }
+            catch
+            {
+                Debug.LogError("Missing spawnPos_4 in json! Setting to NULL.");
+                spawnPos_4 = new Vector3(0, 0, -999); // indicate a non-set spawn
+            }
 
             try
             {
@@ -754,7 +1384,15 @@ namespace SBM_CustomLevels
                         loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
 
                         Material mat = new Material(Shader.Find("Standard"));
-                        mat.color = Color.red;
+                        mat.color = new Color32(255, 0, 0, 128);
+
+                        // for transparency
+                        mat.SetFloat("_Mode", 3);
+                        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        mat.EnableKeyword("_ALPHABLEND_ON");
+                        mat.renderQueue = 3000;
+
                         loadedObject.AddComponent<MeshRenderer>().material = mat;
                     }
                     else if (defaultObject.objectName == "prefabs\\level\\world3\\BoulderDestroyer")
@@ -762,7 +1400,15 @@ namespace SBM_CustomLevels
                         loadedObject = Instantiate(Resources.Load(defaultObject.objectName) as GameObject, defaultObject.GetPosition(), Quaternion.Euler(defaultObject.GetRotation()));
 
                         Material mat = new Material(Shader.Find("Standard"));
-                        mat.color = new Color(0.5f, 0, 0);
+                        mat.color = new Color32(128, 0, 0, 128);
+
+                        // for transparency
+                        mat.SetFloat("_Mode", 3);
+                        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        mat.EnableKeyword("_ALPHABLEND_ON");
+                        mat.renderQueue = 3000;
+
                         loadedObject.AddComponent<MeshRenderer>().material = mat;
                     }
                     else if (defaultObject.objectName == "ScaffoldingBlock")
@@ -882,6 +1528,23 @@ namespace SBM_CustomLevels
                     loadedObject.Size = new Vector3(meshSliceObject.meshWidth, meshSliceObject.meshHeight, meshSliceObject.meshDepth);
                     loadedObject.Regenerate();
 
+                    if (meshSliceObject.objectName.Contains("SlipNSlide"))
+                    {
+                        var colliderSizers = loadedObject.GetComponentsInChildren<Catobyte.Utilities.BoxColliderAutoSizer>();
+                        foreach (var sizer in colliderSizers)
+                        {
+                            sizer.ResizeBoxCollider();
+                        }
+
+                        var edgeRail1 = loadedObject.transform.GetChild(1);
+                        edgeRail1.localScale = new Vector3(edgeRail1.localScale.x, meshSliceObject.meshWidth, edgeRail1.localScale.y);
+                        edgeRail1.localPosition = new Vector3(-0.5f * meshSliceObject.meshWidth, edgeRail1.localPosition.y, edgeRail1.localPosition.z);
+
+                        var edgeRail2 = loadedObject.transform.GetChild(2);
+                        edgeRail2.localScale = new Vector3(edgeRail2.localScale.x, meshSliceObject.meshWidth, edgeRail2.localScale.y);
+                        edgeRail2.localPosition = new Vector3(-0.5f * meshSliceObject.meshWidth, edgeRail2.localPosition.y, edgeRail2.localPosition.z);
+                    }
+
                     loadedObject.transform.root.gameObject.AddComponent<Outline>();
                     loadedObject.transform.root.gameObject.AddComponent<EditorSelectable>();
                 }
@@ -889,6 +1552,36 @@ namespace SBM_CustomLevels
             catch
             {
                 Debug.LogError("Missing meshSliceObjects in json!");
+            }
+
+            try
+            {
+                foreach (SeeSawObject seeSawObject in json.seeSawObjects)
+                {
+                    GameObject loadedObject;
+
+                    loadedObject = Instantiate(Resources.Load(seeSawObject.objectName) as GameObject, seeSawObject.GetPosition(), Quaternion.Euler(seeSawObject.GetRotation()));
+                    Catobyte.Utilities.MeshSliceAndStretch meshSlice = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                    MeshSliceData meshData = loadedObject.transform.root.gameObject.AddComponent<MeshSliceData>();
+                    meshData.width = seeSawObject.meshWidth;
+                    meshData.height = seeSawObject.meshHeight;
+                    meshData.depth = seeSawObject.meshDepth;
+
+                    meshSlice.Size = new Vector3(seeSawObject.meshWidth, seeSawObject.meshHeight, seeSawObject.meshDepth);
+                    meshSlice.Regenerate();
+
+                    var node = PivotNodeHelper.CreatePivotNode(loadedObject.transform);
+                    node.pivotToMove = loadedObject.GetComponent<SBM.Objects.World5.SeeSaw>().cj;
+                    node.transform.localPosition = new Vector3(seeSawObject.pivotPos[0], seeSawObject.pivotPos[1], seeSawObject.pivotPos[2]);
+
+                    loadedObject.transform.root.gameObject.AddComponent<Outline>();
+                    loadedObject.transform.root.gameObject.AddComponent<EditorSelectable>();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing seeSawObjects in json!");
             }
             
             try
@@ -1009,6 +1702,38 @@ namespace SBM_CustomLevels
             {
                 Debug.LogError("Missing splineObjects in json!");
             }
+
+            try
+            {
+                foreach (ColorBlockObject colorBlockObject in json.colorBlockObjects)
+                {
+                    GameObject loadedObject;
+
+                    if (colorBlockObject.isCorner)
+                    {
+                        loadedObject = Instantiate(colorBlockCorner, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+                    else
+                    {
+                        loadedObject = Instantiate(colorBlock, colorBlockObject.GetPosition(), Quaternion.Euler(colorBlockObject.GetRotation()));
+                    }
+
+                    Color32 color = new Color32((byte)colorBlockObject.r, (byte)colorBlockObject.g, (byte)colorBlockObject.b, 255);
+
+                    ColorData colorData = loadedObject.GetComponent<ColorData>();
+                    colorData.color = color;
+
+                    loadedObject.transform.localScale = colorBlockObject.GetScale();
+                    loadedObject.GetComponent<MeshRenderer>().material.color = color;
+
+                    loadedObject.AddComponent<Outline>();
+                    loadedObject.AddComponent<EditorSelectable>();
+                }
+            }
+            catch
+            {
+                Debug.LogError("Missing colorBlockObjects in json!");
+            }
            
             GameObject playerSpawn_1 = Instantiate(playerSpawn);
             playerSpawn_1.name = "PlayerSpawn_1";
@@ -1017,7 +1742,7 @@ namespace SBM_CustomLevels
             playerSpawn_1.AddComponent<SBM.Shared.PlayerSpawnPoint>();
             playerSpawn_1.AddComponent<Outline>();
             playerSpawn_1.AddComponent<EditorSelectable>();
-            instance.spawn1 = playerSpawn_1;
+            instance.spawns[0] = playerSpawn_1;
 
             GameObject playerSpawn_2 = Instantiate(playerSpawn);
             playerSpawn_2.name = "PlayerSpawn_2";
@@ -1026,7 +1751,31 @@ namespace SBM_CustomLevels
             playerSpawn_2.AddComponent<SBM.Shared.PlayerSpawnPoint>();
             playerSpawn_2.AddComponent<Outline>();
             playerSpawn_2.AddComponent<EditorSelectable>();
-            instance.spawn2 = playerSpawn_2;
+            instance.spawns[1] = playerSpawn_2;
+
+            if (spawnPos_3 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_3 = Instantiate(playerSpawn);
+                playerSpawn_3.name = "PlayerSpawn_3";
+                playerSpawn_3.transform.position = spawnPos_3;
+                playerSpawn_3.transform.localScale = new Vector3(1, 2, 1);
+                playerSpawn_3.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+                playerSpawn_3.AddComponent<Outline>();
+                playerSpawn_3.AddComponent<EditorSelectable>();
+                instance.spawns[2] = playerSpawn_3;
+            }
+
+            if (spawnPos_4 != new Vector3(0, 0, -999))
+            {
+                GameObject playerSpawn_4 = Instantiate(playerSpawn);
+                playerSpawn_4.name = "PlayerSpawn_4";
+                playerSpawn_4.transform.position = spawnPos_4;
+                playerSpawn_4.transform.localScale = new Vector3(1, 2, 1);
+                playerSpawn_4.AddComponent<SBM.Shared.PlayerSpawnPoint>();
+                playerSpawn_4.AddComponent<Outline>();
+                playerSpawn_4.AddComponent<EditorSelectable>();
+                instance.spawns[3] = playerSpawn_4;
+            }
         }
 
         //creates a new base level in editor mode
@@ -1044,7 +1793,7 @@ namespace SBM_CustomLevels
             playerSpawn_1.AddComponent<SBM.Shared.PlayerSpawnPoint>();
             playerSpawn_1.AddComponent<Outline>();
             playerSpawn_1.AddComponent<EditorSelectable>();
-            instance.spawn1 = playerSpawn_1;
+            instance.spawns[0] = playerSpawn_1;
 
             GameObject playerSpawn_2 = Instantiate(playerSpawn);
             playerSpawn_2.name = "PlayerSpawn_2";
@@ -1053,7 +1802,7 @@ namespace SBM_CustomLevels
             playerSpawn_2.AddComponent<SBM.Shared.PlayerSpawnPoint>();
             playerSpawn_2.AddComponent<Outline>();
             playerSpawn_2.AddComponent<EditorSelectable>();
-            instance.spawn2 = playerSpawn_2;
+            instance.spawns[1] = playerSpawn_2;
         }
 
         public void InitializeEditor()

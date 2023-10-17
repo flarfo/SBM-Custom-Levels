@@ -1,11 +1,13 @@
-﻿using System;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
+using System;
+using System.Runtime.Serialization;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
-using Object = UnityEngine.Object;
+using SBM_CustomLevels.ObjectWrappers;
+using SBM_CustomLevels.Editor;
 
 namespace SBM_CustomLevels
 {
@@ -54,7 +56,15 @@ namespace SBM_CustomLevels
         "ScaffoldPanelSpline", "ScaffoldPipeExtra", "ScaffoldPipeExtraDouble", "ScaffoldPipeSpline", "SparkShower", "Spotlight", "Spotlight_SurfaceMount", "SteamMachine", "StiffRod", "SupportPole", 
         "TrackingSpotlight", "WaterTank", "World5_BG" }; //may not work with scaffolding, objects are inside another folder ("scaffolding")
 
-        static List<string> customContents = new List<string> { "SplineObject", "ScaffoldingBlock", "ScaffoldingCorner", "ScaffoldPanelBlack", "ScaffoldPanelBrown" };
+        //prefabs stored in the Resources/prefabs/level/basketball folder
+        static List<string> basketallContents = new List<string> { "BasketBall", "BasketballHoop" };
+
+        //prefabs stored in the Resources/prefabs/items folder
+        static List<string> itemContents = new List<string> { "PickupSpawnPoint", "PickupTrigger_Carrot", "PickupTrigger_Jetpack", "PickupTrigger_MagnetGloves", 
+        "PickupTrigger_Rollerskates", "PickupTrigger_UnicornHorn" };
+
+        static List<string> customContents = new List<string> { "SplineObject", "ScaffoldingBlock", "ScaffoldingCorner", "ScaffoldPanelBlack", "ScaffoldPanelBrown", "ColorBlock",
+        "ColorBlockCorner", };
         #endregion
 
         public static void RecordJSONLevel()
@@ -65,67 +75,152 @@ namespace SBM_CustomLevels
             }
 
             //TODO: add try/catch to prevent saving with errors
-            WriteJSON(FindObjectsOfType(typeof(EditorSelectable)) as EditorSelectable[]);
+            var objects = FindObjectsOfType(typeof(EditorSelectable)).Cast<EditorSelectable>().ToList();
+            WriteJSON(objects);
         }
 
-        static void WriteJSON(EditorSelectable[] objects)
+        static void WriteJSON(List<EditorSelectable> objects)
         {
-            List<DefaultObject> defaultObjects = new List<DefaultObject>();
-            List<WaterObject> waterObjects = new List<WaterObject>();
-            List<MeshSliceObject> meshSliceObjects = new List<MeshSliceObject>();
-            List<FlipBlockObject> flipBlockObjects = new List<FlipBlockObject>();
-            List<PistonObject> pistonObjects = new List<PistonObject>();
-            List<RailObject> railObjects = new List<RailObject>();
-            List<SplineObject> splineObjects = new List<SplineObject>();
+            int worldStyle = EditorManager.instance.worldStyle;
 
-            string worldStyle = EditorManager.instance.worldStyle.ToString();
-            Debug.Log("World Style: " + worldStyle);
-            var carrot = FindObjectOfType<SBM.Objects.Common.Carrot.Carrot>();
-            var wormhole = FindObjectOfType<SBM.Objects.Common.Wormhole.Wormhole>();
             var p1 = GameObject.Find("PlayerSpawn_1");
             var p2 = GameObject.Find("PlayerSpawn_2");
+            var p3 = GameObject.Find("PlayerSpawn_3");
+            var p4 = GameObject.Find("PlayerSpawn_4");
 
-            FloatObject spawnPos1 = new FloatObject(p1);
-            FloatObject spawnPos2 = new FloatObject(p2);
+            FloatObject spawnPos1;
+            FloatObject spawnPos2;
+            FloatObject spawnPos3;
+            FloatObject spawnPos4;
 
-            for (int i = 0; i < objects.Length; i++)
+            if (!p1)
             {
-                string objectName = NameToPath(objects[i].name);
+                spawnPos1 = new FloatObject(new Vector3(0, 0, 0));
+            }
+            else
+            {
+                spawnPos1 = new FloatObject(p1);
+            }
 
-                if (objectName.Contains("Water"))
+            if (!p2)
+            {
+                spawnPos2 = new FloatObject(new Vector3(1, 0, 0));
+            }
+            else
+            {
+                spawnPos2 = new FloatObject(p2);
+            }
+
+            if (!p3)
+            {
+                spawnPos3 = new FloatObject(new Vector3(0, 0, -999));
+            }
+            else
+            {
+                spawnPos3 = new FloatObject(p3);
+            }
+
+            if (!p4)
+            {
+                spawnPos4 = new FloatObject(new Vector3(0, 0, -999));
+            }
+            else
+            {
+                spawnPos4 = new FloatObject(p4);
+            }
+
+            Dictionary<int, DefaultObject> objectsDict = new Dictionary<int, DefaultObject>();
+
+            for (int i = 0; i < objects.Count; i++)
+            {
+                //TODO: make sure not to consider children BEFORE their parent
+                DefaultObject parent;
+
+                if (TryGetAsSBMObject(objects[i].gameObject, out DefaultObject parentObject))
                 {
-                    waterObjects.Add(new WaterObject(objects[i].gameObject));
+                    parent = parentObject;
                 }
-                else if (objectName.Contains("MinecartRail") && !objectName.Contains("Sleeper"))
+                else
                 {
-                    railObjects.Add(new RailObject(objects[i].gameObject));
+                    continue;
                 }
-                else if (objectName.Contains("SplineObject"))
+
+                parent.isChild = objects[i].isChild;
+
+                objectsDict.Add(objects[i].GetInstanceID(), parent);
+
+                foreach (Transform childTransform in objects[i].transform)
                 {
-                    splineObjects.Add(new SplineObject(objects[i].gameObject));
-                }
-                else if (objectName.Contains("SeeSaw") || objectName.Contains("StiffRod"))
-                {
-                    meshSliceObjects.Add(new MeshSliceObject(objects[i].gameObject));
-                }
-                else if (objectName.Contains("FlipBlock"))
-                {
-                    flipBlockObjects.Add(new FlipBlockObject(objects[i].gameObject));
-                }
-                else if (objectName.Contains("PistonPlatform"))
-                {
-                    pistonObjects.Add(new PistonObject(objects[i].gameObject));
-                }
-                else if (objectName != string.Empty && !objectName.Contains("Node"))
-                {
-                    defaultObjects.Add(new DefaultObject(objects[i].gameObject));
+                    if (childTransform.TryGetComponent(out EditorSelectable child) && !childTransform.name.Contains("Node"))
+                    {
+                        // make sure child is active to save, otherwise deleted children will be recorded
+                        if (childTransform.gameObject.activeSelf)
+                        {
+                            parent.children.Add(child.GetInstanceID());
+                        }
+                    }
                 }
             }
 
             string filePath = Path.Combine(LevelLoader_Mod.levelsPath, EditorManager.instance.selectedLevel);
 
-            File.WriteAllLines(filePath, new string[] { worldStyle, JsonConvert.SerializeObject(new ObjectContainer(spawnPos1, spawnPos2, defaultObjects, waterObjects, 
-                meshSliceObjects, flipBlockObjects, pistonObjects, railObjects, splineObjects), Formatting.Indented) });
+            File.WriteAllLines(filePath, new string[] { JsonConvert.SerializeObject(new JSONObjectContainer(worldStyle, spawnPos1, spawnPos2, spawnPos3, spawnPos4, objectsDict), Formatting.Indented)});
+        }
+
+        private static bool TryGetAsSBMObject(GameObject gameObject,  out DefaultObject defaultObject)
+        {
+            string objectName = NameToPath(gameObject.name);
+
+            if (objectName.Contains("Water"))
+            {
+                defaultObject = new WaterObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("MinecartRail") && !objectName.Contains("Sleeper"))
+            {
+                defaultObject = new RailObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("SplineObject"))
+            {
+                defaultObject = new SplineObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("StiffRod") || objectName.Contains("SlipNSlide"))
+            {
+                defaultObject = new MeshSliceObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("SeeSaw"))
+            {
+                defaultObject = new SeeSawObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("FlipBlock"))
+            {
+                defaultObject = new FlipBlockObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("PistonPlatform"))
+            {
+                defaultObject = new PistonObject(gameObject);
+                return true;
+            }
+            else if (objectName.Contains("ColorBlock"))
+            {
+                defaultObject = new ColorBlockObject(gameObject);
+                return true;
+            }
+            else if (objectName != string.Empty && !objectName.Contains("Node"))
+            {
+                defaultObject = new DefaultObject(gameObject);
+                return true;
+            }
+            else
+            {
+                defaultObject = null;
+                return false;
+            }
         }
 
         public static string NameToPath(string goName)
@@ -174,6 +269,14 @@ namespace SBM_CustomLevels
                 }
 
             }
+            else if (basketallContents.Contains(goName))
+            {
+                path = Path.Combine(baseResourcesPath, "basketball");
+            }
+            else if (itemContents.Contains(goName))
+            {
+                path = Path.Combine("prefabs", "items");
+            }
             else if (customContents.Contains(goName))
             {
                 return goName;
@@ -182,6 +285,5 @@ namespace SBM_CustomLevels
 
             return Path.Combine(path, goName);
         }
-
     }
 }
