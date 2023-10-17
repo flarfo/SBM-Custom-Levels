@@ -329,28 +329,6 @@ namespace SBM_CustomLevels
 
             if (SBM.Shared.Networking.NetworkSystem.IsInSession)
             {
-                // setup all profiles for CO-OP play, modified version of SBM.UI.Components.UIPlayerRoster.ConfigureCoopPlayersForNetworkPlay()
-
-                if (SBM.Shared.Networking.NetworkSystem.IsHost)
-                {
-                    var localProfile = SBM.Shared.PlayerRoster.GetProfile(1);
-                    var localUserId = SBM.Shared.Networking.NetworkSystem.LocalUserId;
-                    string localUsername = SBM.Shared.Networking.NetworkSystem.LocalUsername;
-
-                    localProfile.Overwrite(0, 0, SBM.Shared.Team.Red, localUserId, true, localUsername);
-
-                    for (int i = 2; i < MultiplayerManager.playerCount; i++)
-                    {
-                        Debug.Log("Creating Profile... " + i);
-
-                        var profile = SBM.Shared.PlayerRoster.GetProfile(i);
-                        var remoteUserId = SBM.Shared.Networking.NetworkSystem.GetRemoteUserId(0);
-                        string username = SBM.Shared.Networking.NetworkSystem.GetUsername(remoteUserId);
-
-                        profile.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId, false, username);
-                    }
-                }
-
                 SBM.Shared.Networking.NetworkSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
                 SBM.Shared.Level.LevelSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
             }
@@ -747,28 +725,6 @@ namespace SBM_CustomLevels
             
             if (SBM.Shared.Networking.NetworkSystem.IsInSession)
             {
-                // setup all profiles for CO-OP play, modified version of SBM.UI.Components.UIPlayerRoster.ConfigureCoopPlayersForNetworkPlay()
-
-                if (SBM.Shared.Networking.NetworkSystem.IsHost)
-                {
-                    var localProfile = SBM.Shared.PlayerRoster.GetProfile(1);
-                    var localUserId = SBM.Shared.Networking.NetworkSystem.LocalUserId;
-                    string localUsername = SBM.Shared.Networking.NetworkSystem.LocalUsername;
-
-                    localProfile.Overwrite(0, 0, SBM.Shared.Team.Red, localUserId, true, localUsername);
-
-                    for (int i = 2; i < MultiplayerManager.playerCount; i++)
-                    {
-                        Debug.Log("Creating Profile... " + i);
-
-                        var profile = SBM.Shared.PlayerRoster.GetProfile(i);
-                        var remoteUserId = SBM.Shared.Networking.NetworkSystem.GetRemoteUserId(0);
-                        string username = SBM.Shared.Networking.NetworkSystem.GetUsername(remoteUserId);
-
-                        profile.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId, false, username);
-                    }
-                }
-                
                 SBM.Shared.Networking.NetworkSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
                 SBM.Shared.Level.LevelSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
             }
