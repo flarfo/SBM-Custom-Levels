@@ -844,9 +844,8 @@ namespace SBM_CustomLevels
 
                     return false;
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Debug.LogError(ex);
                     return false;
                 }
             }
