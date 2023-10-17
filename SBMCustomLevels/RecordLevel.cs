@@ -133,7 +133,6 @@ namespace SBM_CustomLevels
 
             for (int i = 0; i < objects.Count; i++)
             {
-                //TODO: make sure not to consider children BEFORE their parent
                 DefaultObject parent;
 
                 if (TryGetAsSBMObject(objects[i].gameObject, out DefaultObject parentObject))

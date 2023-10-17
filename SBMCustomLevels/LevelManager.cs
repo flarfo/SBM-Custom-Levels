@@ -331,7 +331,7 @@ namespace SBM_CustomLevels
             {
                 // setup all profiles for CO-OP play, modified version of SBM.UI.Components.UIPlayerRoster.ConfigureCoopPlayersForNetworkPlay()
 
-                if (SBM.Shared.Networking.NetworkSystem.IsHost)
+                /*if (SBM.Shared.Networking.NetworkSystem.IsHost)
                 {
                     var localProfile = SBM.Shared.PlayerRoster.GetProfile(1);
                     var localUserId = SBM.Shared.Networking.NetworkSystem.LocalUserId;
@@ -349,7 +349,7 @@ namespace SBM_CustomLevels
 
                         profile.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId, false, username);
                     }
-                }
+                }*/
 
                 SBM.Shared.Networking.NetworkSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
                 SBM.Shared.Level.LevelSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
@@ -749,7 +749,7 @@ namespace SBM_CustomLevels
             {
                 // setup all profiles for CO-OP play, modified version of SBM.UI.Components.UIPlayerRoster.ConfigureCoopPlayersForNetworkPlay()
 
-                if (SBM.Shared.Networking.NetworkSystem.IsHost)
+                /*if (SBM.Shared.Networking.NetworkSystem.IsHost)
                 {
                     var localProfile = SBM.Shared.PlayerRoster.GetProfile(1);
                     var localUserId = SBM.Shared.Networking.NetworkSystem.LocalUserId;
@@ -767,7 +767,7 @@ namespace SBM_CustomLevels
 
                         profile.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId, false, username);
                     }
-                }
+                }*/
                 
                 SBM.Shared.Networking.NetworkSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
                 SBM.Shared.Level.LevelSystem.instance.OnSceneEvent(SBM.Shared.SceneEvent.LoadComplete, SceneManager.GetSceneByName("base level"));
