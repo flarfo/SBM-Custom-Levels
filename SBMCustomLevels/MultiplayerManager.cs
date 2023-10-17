@@ -15,7 +15,7 @@ namespace SBM_CustomLevels
     static class MultiplayerManager
     {
         private static string level;
-        public static int playerCount = 1;
+
         public static string LevelID
         {
             get
@@ -28,6 +28,7 @@ namespace SBM_CustomLevels
             }
         }
 
+        private static GameObject onlineInviteButton;
         private static List<GameObject> connectedPlayerUIs = new List<GameObject>();
 
         private static NetworkChannel CustomChannel;
@@ -44,7 +45,7 @@ namespace SBM_CustomLevels
         // create new packet receiver for "OnReceivedCustomLevelData" so mod specific data can be sent between client and server.
         [HarmonyPatch(typeof(NetworkSystem), "OnNetworkSession_MemberJoined")]
         [HarmonyPrefix]
-        static void UpdatePacketReceivers(NetworkUserId memberId)
+        static void UpdatePacketReceivers(NetworkSystem __instance, NetworkUserId memberId)
         {
             bool userIsLocal = Network.Service.UserIsLocal(memberId);
 
@@ -54,6 +55,9 @@ namespace SBM_CustomLevels
             }
             else
             {
+                // clear existing player roster, since it is updated again in ConfigureCoopPlayersForNetworkPlay
+                OverrideCoopPlayerProfileCount();
+                // Debug.Log($"OnNetworkSession_MemberJoined {Network.Service.GetUsernameById(memberId)}");
                 Network.Session.SubscribeToReceive<CustomSceneData>(memberId, CustomChannel, new OnDataReceived(OnReceivedCustomLevelData), true);
             }
         }
@@ -111,7 +115,7 @@ namespace SBM_CustomLevels
                 // if level type is party, determine and send level based on level itself, not world
                 if (levelType == LevelManager.LevelType.Deathmatch)
                 {
-                    if (!Directory.Exists(LevelLoader_Mod.deathmatchPath)) 
+                    if (!Directory.Exists(LevelLoader_Mod.deathmatchPath))
                     {
                         if (LevelManager.InLevel)
                         {
@@ -257,15 +261,8 @@ namespace SBM_CustomLevels
                 return;
             }
 
-            playerCount -= 1;
-
-            if (playerCount < 1)
-            {
-                playerCount = 1;
-            }
-
             NetworkUser userById = __instance.GetUserById(memberId);
-            
+
             for (int i = 0; i < __instance.users.Count; i++)
             {
                 if (userById == __instance.localUser)
@@ -273,10 +270,10 @@ namespace SBM_CustomLevels
                     continue;
                 }
 
-                if (userById == __instance.users[i])
+                if (userById == __instance.users[i] && i != 1) // dont delete original ui
                 {
-                    GameObject.Destroy(connectedPlayerUIs[i]);
-                    connectedPlayerUIs.RemoveAt(i);
+                    GameObject.Destroy(connectedPlayerUIs[i - 1]);
+                    connectedPlayerUIs.RemoveAt(i - 1);
                 }
             }
         }
@@ -290,6 +287,20 @@ namespace SBM_CustomLevels
             return !NetworkSystem.IsInSession;
         }
 
+        [HarmonyPatch(typeof(SBM.UI.Components.UIGameModeSetter), "SetGameMode_CoopStory")]
+        [HarmonyPrefix]
+        static void UpdateOnlineInviteButtonCoop()
+        {
+            onlineInviteButton.SetActive(true);
+        }
+
+        [HarmonyPatch(typeof(SBM.UI.Components.UIGameModeSetter), "SetGameMode_Story")]
+        [HarmonyPrefix]
+        static void UpdateOnlineInviteButtonStory()
+        {
+            onlineInviteButton.SetActive(false);
+        }
+
         // non-specifically patch UIWorld5Model awake since it is at the same time as UIWorldSelector creation
         // allow the invite UI to properly invite more than 1 person
         [HarmonyPatch(typeof(SBM.UI.MainMenu.StoryMode.UIWorld5Model), "Awake")]
@@ -300,24 +311,27 @@ namespace SBM_CustomLevels
             Transform uiParent = GameObject.Find("Screen_StoryMode").transform;
 
             var inviteButton = uiParent.Find("UI_Bars/UI_Bar_Bottom/Networking/Network_Offline/Button_Invite").GetComponent<UIFocusable>();
+            // re-parent invite button so that it is not deactivated on load and can thus be pressed again for more invitations
+            inviteButton.transform.SetParent(inviteButton.transform.parent.parent);
+            onlineInviteButton = inviteButton.gameObject;
 
             inviteButton.onSubmitSuccess = new UnityEngine.Events.UnityEvent();
             inviteButton.onSubmitSuccess.AddListener(delegate
             {
-                var networkPanel = uiParent.Find("Panel_NetworkInvite").GetComponent<UITransitioner>();
-                networkPanel.Transition_In_From_Top();
-
                 if (!NetworkSystem.IsInSession)
                 {
+                    var networkPanel = uiParent.Find("Panel_NetworkInvite").GetComponent<UITransitioner>();
+                    networkPanel.Transition_In_From_Top();
+
                     return;
                 }
 
                 if (NetworkSystem.IsHost)
                 {
-                    Debug.Log("PLAYER COUNT: " + playerCount);
-
-                    if (playerCount > 1)
+                    if (NetworkSystem.UserCount > 1)
                     {
+                        var networkPanel = uiParent.Find("Panel_NetworkInvite").GetComponent<UITransitioner>();
+
                         networkPanel.Transition_Out_To_Top();
                         GameObject.Find("World Selector").GetComponent<UIFocusable>().Focus();
                         NetworkSystem.InviteViaServiceOverlay();
@@ -326,27 +340,56 @@ namespace SBM_CustomLevels
             });
 
             var networkInvite = uiParent.Find("Panel_NetworkInvite").GetComponent<SBM.UI.MainMenu.StoryMode.UIStoryNetworkInvite>();
+            var networkOnlineUI = uiParent.Find("UI_Bars/UI_Bar_Bottom/Networking/Network_Online").GetComponent<UITransitioner>();
+
+            for (int i = 1; i < NetworkSystem.UserCount; i++)
+            {
+                if (i == 1)
+                {
+                    connectedPlayerUIs.Clear();
+                    networkOnlineUI.Transition_Out_To_Top();
+                    networkOnlineUI.anchoredPosWhenShown = new Vector3(125, 0);
+                    networkOnlineUI.Transition_In_From_Bottom();
+                    networkOnlineUI.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>().PlayerNumber = 1;
+                    continue;
+                }
+
+                var networkGO = GameObject.Instantiate(networkOnlineUI, networkOnlineUI.transform.parent);
+                connectedPlayerUIs.Add(networkGO.gameObject);
+                networkGO.anchoredPosWhenShown = new Vector3(125 + i * 100, 0);
+                networkGO.Transition_In_From_Bottom();
+                var playerIcon = networkGO.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>();
+                playerIcon.PlayerNumber = i + 1;
+                playerIcon.Refresh();
+            }
 
             networkInvite.onInviteSuccess = new UnityEngine.Events.UnityEvent();
             networkInvite.onInviteSuccess.AddListener(delegate
             {
-                playerCount += 1;
+                if (!NetworkSystem.IsHost)
+                {
+                    return;
+                }
 
                 networkInvite.GetComponent<UITransitioner>().Transition_Out_To_Top();
 
-                var networkOnlineUI = uiParent.Find("UI_Bars/UI_Bar_Bottom/Networking/Network_Online").GetComponent<UITransitioner>();
-
-                if (playerCount <= 2)
+                if (NetworkSystem.UserCount <= 2)
                 {
+                    connectedPlayerUIs.Clear();
+                    networkOnlineUI.anchoredPosWhenShown = new Vector3(125, 0);
                     networkOnlineUI.Transition_In_From_Bottom();
-                    networkOnlineUI.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>().PlayerNumber = playerCount;
+                    networkOnlineUI.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>().PlayerNumber = NetworkSystem.UserCount;
                 }
                 else
                 {
                     // duplicate Network_Online UI
-                    var networkGO = GameObject.Instantiate(networkOnlineUI);
-                    networkGO.transform.position = new Vector3(networkOnlineUI.transform.position.x + (playerCount * 5), networkOnlineUI.transform.position.y);
-                    networkGO.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>().PlayerNumber = playerCount;
+                    var networkGO = GameObject.Instantiate(networkOnlineUI, networkOnlineUI.transform.parent);
+                    connectedPlayerUIs.Add(networkGO.gameObject);
+                    networkGO.anchoredPosWhenShown = new Vector3(125 + NetworkSystem.UserCount * 100, 0);
+                    networkGO.Transition_In_From_Bottom();
+                    var playerIcon = networkGO.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>();
+                    playerIcon.PlayerNumber = NetworkSystem.UserCount;
+                    playerIcon.Refresh();
                 }
 
                 GameObject.FindObjectOfType<SBM.UI.MainMenu.StoryMode.UIWorldSelector>().GetComponent<UIFocusable>().Focus();
@@ -357,39 +400,34 @@ namespace SBM_CustomLevels
         // loop through ALL players instead of just first 2 for coop
         [HarmonyPatch(typeof(SBM.UI.Components.UIPlayerRoster), "ConfigureCoopPlayersForNetworkPlay")]
         [HarmonyPrefix]
-        static bool OverrideCoopPlayerProfileCount()
+        public static bool OverrideCoopPlayerProfileCount()
         {
             if (NetworkSystem.IsHost)
             {
+                // Debug.Log("OverrideCoopPlayerProfileCount " + SBM.Shared.PlayerRoster.profiles.Count);
+                // Debug.Log("Network Count " + NetworkSystem.UserCount);
                 var localProfile = SBM.Shared.PlayerRoster.GetProfile(1);
                 NetworkUserId localUserId = NetworkSystem.LocalUserId;
                 string localUsername = NetworkSystem.LocalUsername;
-
                 localProfile.Overwrite(0, 0, SBM.Shared.Team.Red, localUserId, true, localUsername);
 
-                for (int i = 2; i < SBM.Shared.PlayerRoster.profiles.Count; i++)
+                for (int i = 1; i < NetworkSystem.UserCount; i++)
                 {
-                   var remoteProfile = SBM.Shared.PlayerRoster.GetProfile(i);
+                    // register profile here ? (if network.usercount is accurate)
+                    SBM.Shared.PlayerRoster.Deregister(i + 1);
+                    SBM.Shared.PlayerRoster.RegisterRemotePlayer(i + 1, 0, 0, NetworkSystem.instance.users[i].Id);
+                    var remoteProfile1 = SBM.Shared.PlayerRoster.GetProfile(i + 1);
 
-                    NetworkUserId remoteUserId = NetworkSystem.GetRemoteUserId(i - 2); // i - 2, since this should start at 0 (first remote user)
-                    string remoteUsername = NetworkSystem.GetUsername(remoteUserId);
-
-                    // maybe change 0 to i - 2?
-                    remoteProfile.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId, false, remoteUsername);
+                    NetworkUserId remoteUserId1 = NetworkSystem.GetRemoteUserId(i - 1); // i - 1, since this should start at 1 (first remote user)
+                    string remoteUsername1 = NetworkSystem.GetUsername(remoteUserId1);
+                    Debug.Log(remoteUsername1);
+                    Debug.Log(remoteUserId1);
+                    remoteProfile1.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId1, false, remoteUsername1);
                 }
             }
 
             return false;
         }
-
-        // debug
-        /*[HarmonyPatch(typeof(SBM.UI.Components.UIPlayerRoster), "SetupCoopPlayers")]
-        [HarmonyPostfix]
-        static void LogLocalPlayerRoster()
-        {
-            SBM.Shared.PlayerRoster.RegisterLocalPlayer(3, 2);
-            Debug.Log("[Registered Player] Count: " + SBM.Shared.PlayerRoster.LocalPlayerCount + ", Max: " + SBM.Shared.PlayerRoster.MaxPlayers);
-        }*/
 
         // ensure that gamemanager properly spawns all players, regardless of actual player spawn count
         [HarmonyPatch(typeof(SBM.Shared.GameManager), "RespawnAllPlayers")]
@@ -420,19 +458,14 @@ namespace SBM_CustomLevels
             {
                 SBM.Shared.Player byNumber = SBM.Shared.Player.GetByNumber(SBM.Shared.PlayerRoster.GetPlayerNumber(j));
 
-                Debug.Log($"Test {3 + j}");
-
                 if (byNumber != null)
                 {
                     if (j >= __instance.spawnPoints.Count)
                     {
-                        Debug.Log($"Nested Test 3, {j + 1}");
                         Vector3 lastSpawnPoint = __instance.spawnPoints.Last();
 
                         byNumber.SpawnPoint = new Vector3(lastSpawnPoint.x + j, lastSpawnPoint.y, lastSpawnPoint.z);
-                        Debug.Log($"Nested Test 3, {j + 2}");
                         byNumber.Respawn();
-                        Debug.Log($"Nested Test 3, {j + 3}");
 
                         continue;
                     }
@@ -501,9 +534,6 @@ namespace SBM_CustomLevels
 
             // determine if custom level, Scene buildIndex of -1 means it was loaded via assetbundle, meaning a custom level.
             // so method should continue as players are (almost certainly) in the same client scenes.
-
-            //Debug.Log("Current Scene Index: " + SBM.Shared.SceneSystem.CurrentScene.buildIndex);
-            //Debug.Log("Player Scene Index: " + (int)playersData.SceneIndex);
 
             if ((int)playersData.SceneIndex != SBM.Shared.SceneSystem.CurrentScene.buildIndex)
             {
