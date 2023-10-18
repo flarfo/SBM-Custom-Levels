@@ -109,7 +109,7 @@ Ctrl+Left Click | Adds/removes object from selection
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderDestroyer.png) | BoulderDestroyer | Destroys boulders on collision.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/BoulderSpawner.png) | Boulder Spawner | Periodically spawns boulders.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/Minecart.png) | Minecart | Must be placed near minecart rail to connect.
-![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/MinecartRail.png) | Minecart Rail | Bendable spline object with a series of adjustable nodes.
+![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/MinecartRail1.png) | Minecart Rail | Bendable spline object with a series of adjustable nodes.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/WaterFoam_B.png) | Water | Can be configured to rise/fall.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/FlipBlock.png) | Flip Block | Configurable block that rotates x degrees every x seconds.
 ![](https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/PistonPlatform.png) | Piston Platform | Configurable platform that moves up and down based on keyframes.
