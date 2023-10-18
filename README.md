@@ -69,27 +69,7 @@ Ctrl+Left Click | Adds/removes object from selection
 5 | Opens fifth world objects
 6 | Opens party level objects
 
-### Minecart Rails
-- Managed by a series of **rail nodes**. These can be selected individually to adjust the spline of the rail. 
-- Minecarts must be placed near the rail for them to attach. 
-- By changing the **Y component** of the Up vector to -1 in the inspector, rails can be placed upside down. Note that ALL nodes must have the same Up vector.
-- X-Button deletes the currently selected node.
-- Add-Button adds a new rail node after the selected one.
-
-### Water
-- Each water object can be selected to reveal the **Water Keyframes Inspector**. This allows you to configure how the water moves.
-- Set Time/Value pairs to set the height of the water at a specific time. This will be animated automatically in game.
-- X-Button deletes the last keyframe in the inspector.
-- Add-Button adds a new keyframe to the bottom, **maximum of 16 keyframes**.
-
-### Pistons
-- Each piston object can be selected to reveal the **Piston Keyframes Inspector**. This allows you to configure how the piston moves.
-- Set Time/Value pairs to set the extension of the piston at a specific time. This will be animated automatically in game.
-- Normalized so that value of 1 = max extension.
-- X-Button deletes the last keyframe in the inspector.
-- Add-Button adds a new keyframe to the bottom, **maximum of 16 keyframes**.
-
-## Special Object Information
+## Object Information
 
 ### Options Menu
 | Object | Name | Notes |
