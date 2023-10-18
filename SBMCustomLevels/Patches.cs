@@ -7,6 +7,7 @@ using UnityEngine.UI;
 using SceneSystem = SBM.Shared.SceneSystem;
 using SplineMesh;
 using SBM_CustomLevels.Editor;
+using static SBM_CustomLevels.Extensions.Extensions;
 
 namespace SBM_CustomLevels
 {
@@ -24,7 +25,7 @@ namespace SBM_CustomLevels
             {
 				GameObject.Find("Screen_StoryMode").SetActive(false);
 
-				var thing = MenuManager.FindInactiveGameObject<SBM.UI.Utilities.Focus.UIFocusable>("Screen_MainMenu");
+				var thing = FindInactiveGameObject<SBM.UI.Utilities.Focus.UIFocusable>("Screen_MainMenu");
 				thing.gameObject.SetActive(true);
 				thing.gameObject.GetComponent<SBM.UI.Utilities.Transitioner.UITransitioner>().Transition_In_From_Center();
 
