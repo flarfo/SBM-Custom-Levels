@@ -22,22 +22,22 @@ Video Install Guide: https://youtu.be/qNPceLrAVE8
 
 **Navigate to your Super Bunny Man installation**
 <p align="left">
-    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/install-step2.png" height="273" width="576">
+    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/install-step2.png" height="392" width="532">
 </p>
 
 **Copy the folder path of your installation (default C:\Program Files (x86)\Steam\steamapps\common\Super Bunny Man)**
 <p align="left">
-    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/install-step3.png" height="307" width="757">
+    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/install-step3.png" height="295" width="699">
 </p>
 
-**Extract the contents of the release directly into the install folder (uncheck the box that says "SBMCustomLevels-1.0.0")**
+**Extract the contents of the release directly into the install folder (I recommend using 7-Zip)**
 <p align="left">
-    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/install-step4.png" height="359" width="763">
+    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/install-step4.png" height="289" width="515">
 </p>
 
 **The install folder should now look like this:**
 <p align="left">
-    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/install-step5.png" height="237" width="662">
+    <img src="https://github.com/flarfo/SBM-Custom-Levels/blob/master/icon/install-step5.png" height="204" width="619">
 </p>
 
 **Launch the game and have fun!**
