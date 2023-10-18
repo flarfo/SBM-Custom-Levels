@@ -59,7 +59,7 @@ Ctrl+C | Copy
 Ctrl+V | Paste
 Ctrl+X | Cut
 Ctrl+S | Save
-Delete | Deletes select objects
+Delete | Deletes selected objects
 Ctrl+Left Click | Adds/removes object from selection
 ` | Opens options menu
 1 | Opens first world objects
