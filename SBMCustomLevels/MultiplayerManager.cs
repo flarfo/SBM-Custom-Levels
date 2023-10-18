@@ -6,8 +6,10 @@ using Catobyte.Networking;
 using SBM.Shared.Networking;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.UI;
 using UITransitioner = SBM.UI.Utilities.Transitioner.UITransitioner;
 using UIFocusable = SBM.UI.Utilities.Focus.UIFocusable;
+using static SBM_CustomLevels.Extensions.Extensions;
 
 namespace SBM_CustomLevels
 {
@@ -28,7 +30,9 @@ namespace SBM_CustomLevels
             }
         }
 
-        private static GameObject onlineInviteButton;
+        private static UIFocusable onlineInviteButton;
+        private static UIFocusable localInviteButton;
+
         private static List<GameObject> connectedPlayerUIs = new List<GameObject>();
 
         private static NetworkChannel CustomChannel;
@@ -237,21 +241,6 @@ namespace SBM_CustomLevels
             maxPlayers = 4;
         }
 
-        // called on both client and server, use to update UI when a new player (beyond 2nd) joins
-        [HarmonyPatch(typeof(NetworkSystem), "OnNetworkUser_ConnectionReady")]
-        [HarmonyPostfix]
-        static void UpdateOnPlayerJoined(NetworkUser user)
-        {
-            if (NetworkSystem.IsHost && SBM.Shared.PlayerRoster.IsFull)
-            {
-                return;
-            }
-
-            string usernameById = Network.Service.GetUsernameById(user.Id);
-            Debug.Log("Player Joined: " + usernameById);
-        }
-
-
         [HarmonyPatch(typeof(NetworkSystem), "OnNetworkSession_MemberLeft")]
         [HarmonyPostfix]
         static void UpdateOnPlayerLeft(NetworkSystem __instance, NetworkUserId memberId)
@@ -276,6 +265,8 @@ namespace SBM_CustomLevels
                     connectedPlayerUIs.RemoveAt(i - 1);
                 }
             }
+
+            onlineInviteButton.gameObject.GetComponentInChildren<Text>().text = "Online: " + NetworkSystem.RemoteUserCount;
         }
 
         [HarmonyPatch(typeof(SBM.UI.MainMenu.StoryMode.UIStoryNetworkInvite), "BeginInvitation")]
@@ -291,14 +282,19 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
         static void UpdateOnlineInviteButtonCoop()
         {
-            onlineInviteButton.SetActive(true);
+            onlineInviteButton.gameObject.SetActive(true);
+            localInviteButton.gameObject.SetActive(true);
+
+            onlineInviteButton.gameObject.GetComponentInChildren<Text>().text = "Online: " + 0;
+            localInviteButton.gameObject.GetComponentInChildren<Text>().text = "Local: " + 2;
         }
 
         [HarmonyPatch(typeof(SBM.UI.Components.UIGameModeSetter), "SetGameMode_Story")]
         [HarmonyPrefix]
         static void UpdateOnlineInviteButtonStory()
         {
-            onlineInviteButton.SetActive(false);
+            onlineInviteButton.gameObject.SetActive(false);
+            localInviteButton.gameObject.SetActive(false);
         }
 
         // non-specifically patch UIWorld5Model awake since it is at the same time as UIWorldSelector creation
@@ -312,8 +308,16 @@ namespace SBM_CustomLevels
 
             var inviteButton = uiParent.Find("UI_Bars/UI_Bar_Bottom/Networking/Network_Offline/Button_Invite").GetComponent<UIFocusable>();
             // re-parent invite button so that it is not deactivated on load and can thus be pressed again for more invitations
+
+            GameObject.Destroy(inviteButton.gameObject.GetComponentInChildren<UnityEngine.Localization.PropertyVariants.GameObjectLocalizer>());
+            GameObject.Destroy(inviteButton.gameObject.GetComponentInChildren<UnityEngine.Localization.Components.LocalizeStringEvent>());
+
+            var onlineText = inviteButton.gameObject.GetComponentInChildren<Text>();
+            onlineText.text = "Online: " + NetworkSystem.RemoteUserCount;
+
             inviteButton.transform.SetParent(inviteButton.transform.parent.parent);
-            onlineInviteButton = inviteButton.gameObject;
+            inviteButton.transform.localPosition = new Vector3(inviteButton.transform.localPosition.x, inviteButton.transform.localPosition.y + 15, inviteButton.transform.localPosition.z);
+            inviteButton.transform.localScale = 0.75f * inviteButton.transform.localScale;
 
             inviteButton.onSubmitSuccess = new UnityEngine.Events.UnityEvent();
             inviteButton.onSubmitSuccess.AddListener(delegate
@@ -328,7 +332,8 @@ namespace SBM_CustomLevels
 
                 if (NetworkSystem.IsHost)
                 {
-                    if (NetworkSystem.UserCount > 1)
+                    int userCount = SBM.Shared.PlayerRoster.LocalPlayerCount + NetworkSystem.RemoteUserCount;
+                    if (NetworkSystem.UserCount > 1 && userCount < 4)
                     {
                         var networkPanel = uiParent.Find("Panel_NetworkInvite").GetComponent<UITransitioner>();
 
@@ -336,6 +341,51 @@ namespace SBM_CustomLevels
                         GameObject.Find("World Selector").GetComponent<UIFocusable>().Focus();
                         NetworkSystem.InviteViaServiceOverlay();
                     }
+                }
+            });
+
+            onlineInviteButton = inviteButton;
+
+            localInviteButton = GameObject.Instantiate(inviteButton, inviteButton.transform.parent);
+
+            GameObject.Destroy(localInviteButton.gameObject.GetComponentInChildren<UnityEngine.Localization.PropertyVariants.GameObjectLocalizer>());
+            GameObject.Destroy(localInviteButton.gameObject.GetComponentInChildren<UnityEngine.Localization.Components.LocalizeStringEvent>());
+
+            var localText = localInviteButton.gameObject.GetComponentInChildren<Text>();
+            localText.text = "Local: " + SBM.Shared.PlayerRoster.LocalPlayerCount;
+            localInviteButton.transform.localPosition = new Vector3(localInviteButton.transform.localPosition.x, localInviteButton.transform.localPosition.y - 15, localInviteButton.transform.localPosition.z);
+
+            inviteButton.navTargetDown = localInviteButton;
+            localInviteButton.navTargetUp = inviteButton;
+
+            // make button color update with world
+            var colorGroup = FindInactiveGameObject<SBM.UI.Utilities.Color.UIColorTargetGroup>("World Selector");
+            colorGroup.group = colorGroup.group.Append(localInviteButton.GetComponent<SBM.UI.Utilities.Color.UIColorTarget>()).ToArray();
+
+            localInviteButton.onSubmitSuccess = new UnityEngine.Events.UnityEvent();
+            localInviteButton.onSubmitSuccess.AddListener(delegate
+            {
+                // Register next controller
+                int userCount = SBM.Shared.PlayerRoster.LocalPlayerCount + NetworkSystem.RemoteUserCount;
+                if (userCount >= 4)
+                {
+                    return;
+                }
+
+                SBM.Shared.PlayerRoster.RegisterLocalPlayer(userCount + 1, userCount);
+                localText.text = "Local: " + SBM.Shared.PlayerRoster.LocalPlayerCount;
+                Debug.Log("Network User Count: " + userCount);
+                OverrideCoopPlayerProfileCount();
+            });
+
+            localInviteButton.passCancelToParent = false;
+            localInviteButton.onCancel = new UnityEngine.Events.UnityEvent();
+            localInviteButton.onCancel.AddListener(delegate
+            {
+                if (SBM.Shared.PlayerRoster.LocalPlayerCount > 1)
+                {
+                    SBM.Shared.PlayerRoster.Deregister(SBM.Shared.PlayerRoster.LocalPlayerCount);
+                    localText.text = "Local: " + SBM.Shared.PlayerRoster.LocalPlayerCount;
                 }
             });
 
@@ -371,6 +421,8 @@ namespace SBM_CustomLevels
                     return;
                 }
 
+                onlineInviteButton.gameObject.GetComponentInChildren<Text>().text = "Online: " + NetworkSystem.RemoteUserCount;
+
                 networkInvite.GetComponent<UITransitioner>().Transition_Out_To_Top();
 
                 if (NetworkSystem.UserCount <= 2)
@@ -402,27 +454,51 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
         public static bool OverrideCoopPlayerProfileCount()
         {
-            if (NetworkSystem.IsHost)
+            int localPlayerCount = SBM.Shared.PlayerRoster.LocalPlayerCount;
+            SBM.Shared.PlayerRoster.Clear();
+
+            for (int i = 0; i < localPlayerCount; i++)
             {
-                // Debug.Log("OverrideCoopPlayerProfileCount " + SBM.Shared.PlayerRoster.profiles.Count);
-                // Debug.Log("Network Count " + NetworkSystem.UserCount);
-                var localProfile = SBM.Shared.PlayerRoster.GetProfile(1);
+                SBM.Shared.PlayerRoster.RegisterLocalPlayer(i + 1, i);
+                var localProfile = SBM.Shared.PlayerRoster.GetProfile(i + 1);
                 NetworkUserId localUserId = NetworkSystem.LocalUserId;
                 string localUsername = NetworkSystem.LocalUsername;
-                localProfile.Overwrite(0, 0, SBM.Shared.Team.Red, localUserId, true, localUsername);
+                localProfile.Overwrite(i + 1, i, SBM.Shared.Team.Red, localUserId, true, localUsername);
+            }
 
-                for (int i = 1; i < NetworkSystem.UserCount; i++)
+            if (!NetworkSystem.IsInSession)
+            {
+                return false;
+            }
+
+            if (NetworkSystem.IsHost)
+            {
+                List<NetworkUser> remoteUsers = new List<NetworkUser>();
+                for (int i = 0; i < NetworkSystem.UserCount; i++)
                 {
-                    // register profile here ? (if network.usercount is accurate)
-                    SBM.Shared.PlayerRoster.Deregister(i + 1);
-                    SBM.Shared.PlayerRoster.RegisterRemotePlayer(i + 1, 0, 0, NetworkSystem.instance.users[i].Id);
-                    var remoteProfile1 = SBM.Shared.PlayerRoster.GetProfile(i + 1);
+                    if (NetworkSystem.UserIsRemote(NetworkSystem.instance.users[i].id))
+                    {
+                        remoteUsers.Add(NetworkSystem.instance.users[i]);
+                    }
+                }
 
-                    NetworkUserId remoteUserId1 = NetworkSystem.GetRemoteUserId(i - 1); // i - 1, since this should start at 1 (first remote user)
-                    string remoteUsername1 = NetworkSystem.GetUsername(remoteUserId1);
-                    Debug.Log(remoteUsername1);
-                    Debug.Log(remoteUserId1);
-                    remoteProfile1.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId1, false, remoteUsername1);
+                for (int i = 0; i < remoteUsers.Count; i++)
+                {
+                    int id = SBM.Shared.PlayerRoster.LocalPlayerCount + NetworkSystem.RemoteUserCount - i;
+
+                    if (SBM.Shared.PlayerRoster.PlayerIsRegistered(id))
+                    {
+                        SBM.Shared.PlayerRoster.Deregister(id);
+                    }
+
+                    SBM.Shared.PlayerRoster.RegisterRemotePlayer(id, 0, 0, NetworkSystem.instance.users[i].Id);
+                    var remoteProfile = SBM.Shared.PlayerRoster.GetProfile(id);
+
+                    NetworkUserId remoteUserId = NetworkSystem.GetRemoteUserId(i); // i - 1, since this should start at 1 (first remote user)
+                    string remoteUsername = NetworkSystem.GetUsername(remoteUserId);
+                    Debug.Log(remoteUsername);
+                    Debug.Log(remoteUserId);
+                    remoteProfile.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId, false, remoteUsername);
                 }
             }
 
