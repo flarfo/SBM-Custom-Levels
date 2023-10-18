@@ -14,6 +14,7 @@ using UITransitioner = SBM.UI.Utilities.Transitioner.UITransitioner;
 using UITransitionerCarousel = SBM.UI.Utilities.Transitioner.UITransitionerCarousel;
 using SoftMasking;
 using SBM_CustomLevels.Editor;
+using static SBM_CustomLevels.Extensions.Extensions;
 
 namespace SBM_CustomLevels
 {
@@ -85,38 +86,6 @@ namespace SBM_CustomLevels
             {
                 worldNameButton.Navigate(UI.Utilities.Focus.UINav.Down);
             }
-        }
-
-        //searches all objects of specific name, returns object matching name if found
-        public static GameObject FindInactiveGameObject(string name)
-        {
-            GameObject[] objects = Resources.FindObjectsOfTypeAll<GameObject>();
-
-            for (int i = 0; i < objects.Length; i++)
-            {
-                if (name == objects[i].name)
-                {
-                    return objects[i];
-                }
-            }
-
-            return null;
-        }
-
-        //searches all objects of specific type and name, returns object matching name if found
-        public static T FindInactiveGameObject<T>(string name) where T : UnityEngine.Object
-        {
-            T[] objects = Resources.FindObjectsOfTypeAll<T>();
-
-            for (int i = 0; i < objects.Length; i++)
-            {
-                if (name == objects[i].name)
-                {
-                    return objects[i];
-                }
-            }
-
-            return null;
         }
 
         public void UpdateWorldButtons()
