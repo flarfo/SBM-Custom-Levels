@@ -159,6 +159,8 @@ namespace SBM_CustomLevels.Editor
             whiteTexture.Apply();
 
             defaultCube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+
+            
         }
 
         private void Update()
@@ -1069,7 +1071,6 @@ namespace SBM_CustomLevels.Editor
                             loadedObject.layer = 0;
                         }
                     }
-
                     break;
                 case ObjectType.ColorBlock:
                     ColorBlockObject colorBlockObject = obj as ColorBlockObject;
@@ -1131,6 +1132,7 @@ namespace SBM_CustomLevels.Editor
                     var meshSliceFlip = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
                     meshSliceFlip.Size = meshSizeFlip;
                     meshSliceFlip.Regenerate();
+                    loadedObject.transform.localScale = obj.GetScale();
                     break;
                 case ObjectType.MeshSlice:
                     MeshSliceObject meshSliceObject = obj as MeshSliceObject;
@@ -1165,6 +1167,7 @@ namespace SBM_CustomLevels.Editor
                     }
                     
                     loadedObject = mObj.transform.root.gameObject;
+                    loadedObject.transform.localScale = obj.GetScale();
                     break;
                 case ObjectType.Piston:
                     PistonObject pistonObject = obj as PistonObject;
@@ -1193,10 +1196,12 @@ namespace SBM_CustomLevels.Editor
                     var meshSlicePiston = loadedObject.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
                     meshSlicePiston.Size = meshSizePiston;
                     meshSlicePiston.Regenerate();
+                    loadedObject.transform.localScale = obj.GetScale();
                     break;
                 case ObjectType.Rail:
                     RailObject railObject = obj as RailObject;
                     loadedObject = MinecartRailHelper.CreateRailFromObject(railObject, isEditor);
+                    loadedObject.transform.localScale = obj.GetScale();
                     break;
                 case ObjectType.SeeSaw:
                     SeeSawObject seeSawObject = obj as SeeSawObject;
@@ -1228,49 +1233,84 @@ namespace SBM_CustomLevels.Editor
                         node.pivotToMove = pivotJoint;
                         node.transform.localPosition = new Vector3(seeSawObject.pivotPos[0], seeSawObject.pivotPos[1], seeSawObject.pivotPos[2]);
                     }
-                    
+                    loadedObject.transform.localScale = obj.GetScale();
                     break;
                 case ObjectType.Spline:
                     SplineObject splineObject = obj as SplineObject;
                     loadedObject = SplineMakerHelper.CreateSplineFromObject(splineObject, true);
+                    loadedObject.transform.localScale = obj.GetScale();
                     break;
                 case ObjectType.Water:
                     WaterObject waterObject = obj as WaterObject;
-                    if (waterObject.w5)
+
+                    if (isEditor)
                     {
-                        Catobyte.Utilities.MeshSliceAndStretch loadedMeshSlice;
-                        loadedMeshSlice = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+                        if (waterObject.w5)
+                        {
+                            Catobyte.Utilities.MeshSliceAndStretch loadedMeshSlice;
+                            loadedMeshSlice = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
 
-                        Destroy(loadedMeshSlice.transform.root.Find("Water_W5").gameObject);
+                            Destroy(loadedMeshSlice.transform.root.Find("Water_W5").gameObject);
 
-                        WaterDataContainer fakeWaterTank = loadedMeshSlice.transform.root.gameObject.AddComponent<WaterDataContainer>();
+                            WaterDataContainer fakeWaterTank = loadedMeshSlice.transform.root.gameObject.AddComponent<WaterDataContainer>();
 
-                        fakeWaterTank.w5 = true;
-                        fakeWaterTank.width = waterObject.waterWidth;
-                        fakeWaterTank.height = waterObject.waterHeight;
-                        fakeWaterTank.keyframes = waterObject.keyframes;
+                            fakeWaterTank.w5 = true;
+                            fakeWaterTank.width = waterObject.waterWidth;
+                            fakeWaterTank.height = waterObject.waterHeight;
+                            fakeWaterTank.keyframes = waterObject.keyframes;
 
-                        MeshSliceData meshData = loadedMeshSlice.transform.root.gameObject.AddComponent<MeshSliceData>();
-                        meshData.width = waterObject.waterWidth;
-                        meshData.height = waterObject.waterHeight;
-                        meshData.depth = 1;
+                            MeshSliceData meshData = loadedMeshSlice.transform.root.gameObject.AddComponent<MeshSliceData>();
+                            meshData.width = waterObject.waterWidth;
+                            meshData.height = waterObject.waterHeight;
+                            meshData.depth = 1;
 
-                        loadedMeshSlice.Size = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1.15f);
-                        loadedMeshSlice.Regenerate();
+                            loadedMeshSlice.Size = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1.15f);
+                            loadedMeshSlice.Regenerate();
 
-                        loadedObject = loadedMeshSlice.transform.root.gameObject;
+                            loadedObject = loadedMeshSlice.transform.root.gameObject;
 
-                        break;
+                            break;
+                        }
+
+                        loadedObject = Instantiate(EditorManager.fakeWater, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation()));
+
+                        loadedObject.transform.localScale = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1);
+
+                        WaterDataContainer fakeWater = loadedObject.GetComponent<WaterDataContainer>();
+                        fakeWater.width = waterObject.waterWidth;
+                        fakeWater.height = waterObject.waterHeight;
+                        fakeWater.keyframes = waterObject.keyframes;
                     }
+                    else
+                    {
+                        SBM.Shared.Utilities.Water.Water loadedWater;
 
-                    loadedObject = Instantiate(EditorManager.fakeWater, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation()));
+                        LevelManager.instance.curWaterHeight = waterObject.waterHeight;
+                        LevelManager.instance.curWaterWidth = waterObject.waterWidth;
 
-                    loadedObject.transform.localScale = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1);
+                        if (waterObject.w5)
+                        {
+                            //Destroy(loadedObject.transform.Find("Water_W5").gameObject);
+                            loadedWater = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponentInChildren<SBM.Shared.Utilities.Water.Water>();
 
-                    WaterDataContainer fakeWater = loadedObject.GetComponent<WaterDataContainer>();
-                    fakeWater.width = waterObject.waterWidth;
-                    fakeWater.height = waterObject.waterHeight;
-                    fakeWater.keyframes = waterObject.keyframes;
+                            var meshSlice = loadedWater.transform.root.GetComponentInChildren<Catobyte.Utilities.MeshSliceAndStretch>();
+
+                            meshSlice.Size = new Vector3(waterObject.waterWidth, waterObject.waterHeight, 1.15f);
+                            meshSlice.Regenerate();
+                        }
+                        else
+                        {
+                            loadedWater = Instantiate(Resources.Load(waterObject.objectName) as GameObject, waterObject.GetPosition(), Quaternion.Euler(waterObject.GetRotation())).GetComponent<SBM.Shared.Utilities.Water.Water>();
+                        }
+
+                        if (waterObject.keyframes.Count > 0)
+                        {
+                            loadedWater.AnimateWaterHeight = true;
+                            loadedWater.WaterHeightVsTime = new AnimationCurve(waterObject.keyframes.ToArray());
+                        }
+
+                        loadedObject = loadedWater.transform.root.gameObject;
+                    }
                     break;
                 default:
                     loadedObject = Instantiate(Resources.Load(obj.objectName) as GameObject, obj.GetPosition(), Quaternion.Euler(obj.GetRotation()));
@@ -1299,12 +1339,14 @@ namespace SBM_CustomLevels.Editor
                 loadedObject.transform.parent = parent;
             }
 
-            loadedObject.transform.localScale = obj.GetScale();
-
             // spawn all object children, recursive
             foreach (int child in obj.children)
             {
-                SpawnObject(objects[child], objects, loadedObject.transform, isEditor: isEditor);
+                if (objects.TryGetValue(child, out DefaultObject childObject))
+                {
+                    SpawnObject(childObject, objects, loadedObject.transform, isEditor: isEditor);
+                }
+                
             }
 
             return loadedObject;
