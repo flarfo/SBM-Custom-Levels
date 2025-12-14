@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Catobyte.Networking;
 using SBM.Shared.Networking;
+using SBM.UI;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
@@ -60,7 +61,7 @@ namespace SBM_CustomLevels
             else
             {
                 // clear existing player roster, since it is updated again in ConfigureCoopPlayersForNetworkPlay
-                OverrideCoopPlayerProfileCount();
+                // OverrideCoopPlayerProfileCount();
                 // Debug.Log($"OnNetworkSession_MemberJoined {Network.Service.GetUsernameById(memberId)}");
                 Network.Session.SubscribeToReceive<CustomSceneData>(memberId, CustomChannel, new OnDataReceived(OnReceivedCustomLevelData), true);
             }
@@ -375,7 +376,7 @@ namespace SBM_CustomLevels
                 SBM.Shared.PlayerRoster.RegisterLocalPlayer(userCount + 1, userCount);
                 localText.text = "Local: " + SBM.Shared.PlayerRoster.LocalPlayerCount;
                 Debug.Log("Network User Count: " + userCount);
-                OverrideCoopPlayerProfileCount();
+                // OverrideCoopPlayerProfileCount();
             });
 
             localInviteButton.passCancelToParent = false;
@@ -440,7 +441,7 @@ namespace SBM_CustomLevels
                     networkGO.anchoredPosWhenShown = new Vector3(125 + NetworkSystem.UserCount * 100, 0);
                     networkGO.Transition_In_From_Bottom();
                     var playerIcon = networkGO.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>();
-                    playerIcon.PlayerNumber = NetworkSystem.UserCount;
+                    playerIcon.RemoteUserIndex = NetworkSystem.UserCount;
                     playerIcon.Refresh();
                 }
 
@@ -452,54 +453,28 @@ namespace SBM_CustomLevels
         // loop through ALL players instead of just first 2 for coop
         [HarmonyPatch(typeof(SBM.UI.Components.UIPlayerRoster), "ConfigureCoopPlayersForNetworkPlay")]
         [HarmonyPrefix]
-        public static bool OverrideCoopPlayerProfileCount()
+        public static bool OverrideCoopPlayerProfileCount(SBM.UI.Components.UIPlayerRoster __instance)
         {
             int localPlayerCount = SBM.Shared.PlayerRoster.LocalPlayerCount;
             SBM.Shared.PlayerRoster.Clear();
 
+            // Register local players
             for (int i = 0; i < localPlayerCount; i++)
             {
-                SBM.Shared.PlayerRoster.RegisterLocalPlayer(i + 1, i);
-                var localProfile = SBM.Shared.PlayerRoster.GetProfile(i + 1);
-                NetworkUserId localUserId = NetworkSystem.LocalUserId;
-                string localUsername = NetworkSystem.LocalUsername;
-                localProfile.Overwrite(i + 1, i, SBM.Shared.Team.Red, localUserId, true, localUsername);
+                __instance.RegisterNextAvailablePlayerToInputDevice(i);
             }
 
-            if (!NetworkSystem.IsInSession)
+            if (!NetworkSystem.IsInSession || NetworkSystem.IsHost)
             {
                 return false;
             }
 
-            if (NetworkSystem.IsHost)
+            var remoteUsers = NetworkSystem.instance.users.Where(u => NetworkSystem.UserIsRemote(u.id)).ToList();
+
+            // Register remote players
+            for (int i = 0; i < remoteUsers.Count(); i++)
             {
-                List<NetworkUser> remoteUsers = new List<NetworkUser>();
-                for (int i = 0; i < NetworkSystem.UserCount; i++)
-                {
-                    if (NetworkSystem.UserIsRemote(NetworkSystem.instance.users[i].id))
-                    {
-                        remoteUsers.Add(NetworkSystem.instance.users[i]);
-                    }
-                }
-
-                for (int i = 0; i < remoteUsers.Count; i++)
-                {
-                    int id = SBM.Shared.PlayerRoster.LocalPlayerCount + NetworkSystem.RemoteUserCount - i;
-
-                    if (SBM.Shared.PlayerRoster.PlayerIsRegistered(id))
-                    {
-                        SBM.Shared.PlayerRoster.Deregister(id);
-                    }
-
-                    SBM.Shared.PlayerRoster.RegisterRemotePlayer(id, 0, 0, NetworkSystem.instance.users[i].Id);
-                    var remoteProfile = SBM.Shared.PlayerRoster.GetProfile(id);
-
-                    NetworkUserId remoteUserId = NetworkSystem.GetRemoteUserId(i); // i - 1, since this should start at 1 (first remote user)
-                    string remoteUsername = NetworkSystem.GetUsername(remoteUserId);
-                    Debug.Log(remoteUsername);
-                    Debug.Log(remoteUserId);
-                    remoteProfile.Overwrite(0, 0, SBM.Shared.Team.Red, remoteUserId, false, remoteUsername);
-                }
+                __instance.RegisterNextAvailablePlayerToRemoteNetworkUser(i);
             }
 
             return false;
