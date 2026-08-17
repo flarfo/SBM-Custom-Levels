@@ -11,6 +11,7 @@ using SBM_CustomLevels.ObjectWrappers;
 using SBM_CustomLevels.Objects;
 using SceneSystem = SBM.Shared.SceneSystem;
 using Systems = SBM.Shared.Systems;
+using static SBM_CustomLevels.Extensions.Extensions;
 
 namespace SBM_CustomLevels
 {
@@ -92,7 +93,7 @@ namespace SBM_CustomLevels
                 sceneBundle.Unload(true);
 
                 Scene sceneByName = SceneManager.GetSceneByName("base level");
-                SceneSystem.CurrentScene = sceneByName;
+                SetStaticPropertyValue(typeof(SceneSystem), "CurrentScene", sceneByName);
 
                 foreach (GameObject gameObject in SceneManager.GetSceneByName("Systems").GetRootGameObjects())
                 {

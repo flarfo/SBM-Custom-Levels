@@ -47,8 +47,18 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\ref\Catobyte.Networking.dll</HintPath>
     </Reference>
+    <Reference Include="Catobyte.Networking.NetworkSessionId.Steam">
+      <HintPath>..\ref\Catobyte.Networking.NetworkSessionId.Steam.dll</HintPath>
+    </Reference>
+    <Reference Include="Catobyte.Networking.NetworkUserId.Steam">
+      <HintPath>..\ref\Catobyte.Networking.NetworkUserId.Steam.dll</HintPath>
+    </Reference>
     <Reference Include="Catobyte.Networking.Physics">
       <HintPath>..\ref\Catobyte.Networking.Physics.dll</HintPath>
+    </Reference>
+    <Reference Include="Catobyte.SaveFile, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\ref\Catobyte.SaveFile.dll</HintPath>
     </Reference>
     <Reference Include="Catobyte.Settings, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>

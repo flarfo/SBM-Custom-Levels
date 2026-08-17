@@ -366,8 +366,8 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
 		static bool FixStoryStartPatch(SBM.Objects.GameModes.Story.GameManagerStory __instance)
         {
-			if (LevelManager.InLevel)
-            {
+			if (LevelManager.InLevel || EditorManager.InEditor)
+			{
 				SBM.Shared.Cameras.TrackingCamera.ScheduleCenterOnTargets();
 
 				SBM.Shared.WorldResetHandler.ScanForResettables();
@@ -377,7 +377,7 @@ namespace SBM_CustomLevels
 			}
 
 			return true;
-        }
+		}
 
         [HarmonyPatch(typeof(SBM.Objects.GameModes.Basketball.Basketball), "Start")]
         [HarmonyPrefix]
@@ -402,9 +402,8 @@ namespace SBM_CustomLevels
 				Object.Destroy(__instance);
 				return false;
 			}
-
-			SBM.Shared.GameManager.Instance = __instance;
-			SBM.Shared.GameManager.Exists = true;
+			SetStaticPropertyValue(typeof(SBM.Shared.GameManager), "Instance", __instance);
+			SetStaticPropertyValue(typeof(SBM.Shared.GameManager), "Exists", true);
 			SBM.Shared.GameMode.Current = __instance.GameModeType;
 			__instance.timer = new SBM.Shared.Utilities.Timer();
 			__instance.scheduledRespawns = new SBM.Shared.Utilities.ExpirableList<SBM.Shared.Player>();
@@ -427,6 +426,7 @@ namespace SBM_CustomLevels
 					__instance.EndRound(-1f);
 				}
 			};
+			SBM.Shared.PlayerRoster.OnRosterEvent += __instance.OnPlayerRosterEvent;
 			SBM.Shared.PlayerRoster.OnRosterEvent += __instance.OnPlayerRosterEvent;
 			SBM.Shared.Player.RegenerateAll();
 			SBM.Shared.Cameras.TrackingCamera.ScheduleCenterOnTargets();

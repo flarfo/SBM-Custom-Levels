@@ -155,8 +155,9 @@ namespace SBM_CustomLevels
                         {
                             break;
                         }
-
+                        
                         GameObject levelObject = customLevels.group[count2].gameObject;
+                        Debug.Log(levelObject.name + " " + count2);
                         levelObject.SetActive(true);
 
                         levelObject.GetComponentInChildren<Text>().text = (count2 + 1).ToString();
@@ -164,16 +165,22 @@ namespace SBM_CustomLevels
                         levelObject.GetComponent<UIFocusable>().onSubmitSuccess.RemoveAllListeners();
                         levelObject.GetComponent<UIFocusable>().onSubmitSuccess.AddListener(delegate
                         {
+                            Debug.Log(levelObject.name + " CLICKED");
                             EditorManager.instance.selectedLevel = level.levelPath;
                             EditorManager.InEditor = true;
+                            Debug.Log(EditorManager.instance.name);
 
                             if (File.ReadAllBytes(level.levelPath).Length != 0)
                             {
+                                Debug.Log("LOADING");
                                 LevelManager.instance.BeginLoadLevel(true, false, level.levelPath, 0, LevelManager.LevelType.Editor); // if level is not empty, load as existing level
+                                Debug.Log("LOADED");
                             }
                             else
                             {
+                                Debug.Log("LOADING EMPTY");
                                 LevelManager.instance.BeginLoadLevel(true, true, level.levelPath, 0, LevelManager.LevelType.Editor); // if level is empty, load as new level (create carrot, prefabs, etc.)
+                                Debug.Log("LOADED EMPTY");
                             }
                         });
 

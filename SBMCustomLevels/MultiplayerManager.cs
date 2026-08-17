@@ -3,6 +3,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Catobyte.Networking;
+using Catobyte.Networking.Physics;
 using SBM.Shared.Networking;
 using SBM.UI;
 using HarmonyLib;
@@ -18,6 +19,7 @@ namespace SBM_CustomLevels
     static class MultiplayerManager
     {
         private static string level;
+        private static Dictionary<ushort, DateTime> timeOfLastRemoteDataByAgentId = new Dictionary<ushort, DateTime>();
 
         public static string LevelID
         {
@@ -50,7 +52,7 @@ namespace SBM_CustomLevels
         // create new packet receiver for "OnReceivedCustomLevelData" so mod specific data can be sent between client and server.
         [HarmonyPatch(typeof(NetworkSystem), "OnNetworkSession_MemberJoined")]
         [HarmonyPrefix]
-        static void UpdatePacketReceivers(NetworkSystem __instance, NetworkUserId memberId)
+        static void UpdatePacketReceivers(NetworkSystem __instance, Catobyte.Networking.NetworkUserId memberId)
         {
             bool userIsLocal = Network.Service.UserIsLocal(memberId);
 
@@ -239,7 +241,34 @@ namespace SBM_CustomLevels
         [HarmonyPrefix]
         static void IncreaseMaxPlayers(ref int maxPlayers, SessionAccess access)
         {
+            timeOfLastRemoteDataByAgentId.Clear();
             maxPlayers = 4;
+        }
+
+        private static bool ShouldSnapRemoteAuthDecs(Catobyte.Networking.Physics.Authority.NetworkAgent agent, TickNumber tickNumber)
+        {
+            bool snap = false;
+
+            if (tickNumber > agent.RemoteTickNumber)
+            {
+                DateTime now = DateTime.Now;
+
+                if (timeOfLastRemoteDataByAgentId.TryGetValue(agent.Id, out DateTime lastRemoteDataTime))
+                {
+                    if ((now - lastRemoteDataTime).TotalMilliseconds > 500.0)
+                    {
+                        snap = true;
+                    }
+
+                    timeOfLastRemoteDataByAgentId[agent.Id] = now;
+                }
+                else
+                {
+                    timeOfLastRemoteDataByAgentId.Add(agent.Id, now);
+                }
+            }
+
+            return snap;
         }
 
         [HarmonyPatch(typeof(NetworkSystem), "OnNetworkSession_MemberLeft")]
@@ -340,7 +369,7 @@ namespace SBM_CustomLevels
 
                         networkPanel.Transition_Out_To_Top();
                         GameObject.Find("World Selector").GetComponent<UIFocusable>().Focus();
-                        NetworkSystem.InviteViaServiceOverlay();
+                        NetworkSystem.InviteViaServiceOverlay(delegate { });
                     }
                 }
             });
@@ -426,8 +455,8 @@ namespace SBM_CustomLevels
 
                 networkInvite.GetComponent<UITransitioner>().Transition_Out_To_Top();
 
-                if (NetworkSystem.UserCount <= 2)
-                {
+                if (NetworkSystem.UserCount <= 2) 
+                { 
                     connectedPlayerUIs.Clear();
                     networkOnlineUI.anchoredPosWhenShown = new Vector3(125, 0);
                     networkOnlineUI.Transition_In_From_Bottom();
@@ -441,7 +470,7 @@ namespace SBM_CustomLevels
                     networkGO.anchoredPosWhenShown = new Vector3(125 + NetworkSystem.UserCount * 100, 0);
                     networkGO.Transition_In_From_Bottom();
                     var playerIcon = networkGO.transform.Find("RemotePlayerIcon").GetComponent<SBM.UI.Components.PlayerIcon.UIRemotePlayerIcon>();
-                    playerIcon.RemoteUserIndex = NetworkSystem.UserCount;
+                    playerIcon.RemoteUserIndex = NetworkSystem.RemoteUserCount - 1;
                     playerIcon.Refresh();
                 }
 
@@ -464,7 +493,7 @@ namespace SBM_CustomLevels
                 __instance.RegisterNextAvailablePlayerToInputDevice(i);
             }
 
-            if (!NetworkSystem.IsInSession || NetworkSystem.IsHost)
+            if (!NetworkSystem.IsInSession || !NetworkSystem.IsHost)
             {
                 return false;
             }
@@ -476,6 +505,13 @@ namespace SBM_CustomLevels
             {
                 __instance.RegisterNextAvailablePlayerToRemoteNetworkUser(i);
             }
+
+            Debug.Log(
+                $"Users={NetworkSystem.UserCount}, " +
+                $"Remotes={NetworkSystem.RemoteUserCount}, " +
+                $"Players={SBM.Shared.Player.Count}, " +
+                $"Roster={SBM.Shared.PlayerRoster.Profiles.Count}"
+            );
 
             return false;
         }
@@ -505,25 +541,30 @@ namespace SBM_CustomLevels
 
             Debug.Log("Spawn Count: " + __instance.spawnPoints.Count);
 
-            for (int j = 0; j < SBM.Shared.PlayerRoster.Profiles.Count; j++)
+            int playerCount = SBM.Shared.Player.Count;
+
+            for (int j = 0; j < playerCount; j++)
             {
-                SBM.Shared.Player byNumber = SBM.Shared.Player.GetByNumber(SBM.Shared.PlayerRoster.GetPlayerNumber(j));
-
-                if (byNumber != null)
+                var player = SBM.Shared.Player.GetByIndex(j);
+                if (player == null)
                 {
-                    if (j >= __instance.spawnPoints.Count)
-                    {
-                        Vector3 lastSpawnPoint = __instance.spawnPoints.Last();
-
-                        byNumber.SpawnPoint = new Vector3(lastSpawnPoint.x + j, lastSpawnPoint.y, lastSpawnPoint.z);
-                        byNumber.Respawn();
-
-                        continue;
-                    }
-
-                    byNumber.SpawnPoint = __instance.spawnPoints[j];
-                    byNumber.Respawn();
+                    continue;
                 }
+
+                Vector3 spawnPoint;
+
+                if (j >= __instance.spawnPoints.Count)
+                {
+                    Vector3 last = __instance.spawnPoints.Last();
+                    spawnPoint = new Vector3(last.x + j, last.y, last.z);
+                }
+                else
+                {
+                    spawnPoint = __instance.spawnPoints[j];
+                }
+
+                player.SpawnPoint = spawnPoint;
+                player.Respawn();
             }
 
             return false;
@@ -704,18 +745,18 @@ namespace SBM_CustomLevels
                 }
                 __instance.SetTeamScore(SBM.Shared.Team.Red, (int)data.ScoreRedTeam);
                 __instance.SetTeamScore(SBM.Shared.Team.Blue, (int)data.ScoreBlueTeam);
-                __instance.Winner = SBM.Shared.Player.GetByNumber((int)data.WinningPlayerNumber);
+                SetPropertyValue(__instance, "Winner", SBM.Shared.Player.GetByNumber((int)data.WinningPlayerNumber));
                 if (data.RedTeamIsWinner)
                 {
-                    __instance.WinningTeam = new SBM.Shared.Team?(SBM.Shared.Team.Red);
+                    SetPropertyValue(__instance, "WinningTeam", new SBM.Shared.Team?(SBM.Shared.Team.Red));
                 }
                 else if (data.BlueTeamIsWinner)
                 {
-                    __instance.WinningTeam = new SBM.Shared.Team?(SBM.Shared.Team.Blue);
+                    SetPropertyValue(__instance, "WinningTeam", new SBM.Shared.Team?(SBM.Shared.Team.Blue));
                 }
                 else
                 {
-                    __instance.WinningTeam = null;
+                    SetPropertyValue(__instance, "WinningTeam", null);
                 }
             }
             if (!NetworkSystem.IsHost && senderIsHost)
@@ -790,13 +831,12 @@ namespace SBM_CustomLevels
                 }
                 if (physicsData.AuthDecs.Count == 0)
                 {
-                    byId.ClearRemoteAuthDecs();
+                    byId.ClearAuthorities();
                     return false;
                 }
-                for (int i = 0; i < physicsData.AuthDecs.Count; i++)
-                {
-                    byId.ReceiveRemoteAuthDec(physicsData.AuthDecs[i], tickNumber);
-                }
+
+                bool snap = ShouldSnapRemoteAuthDecs(byId, tickNumber);
+                byId.ReceiveRemoteAuthDecs(physicsData.AuthDecs, tickNumber, physicsData.AuthChainIndex, physicsData.DeclaredAuthChainIndices, snap);
             }
 
             return false;

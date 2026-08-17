@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 namespace SBM_CustomLevels.Extensions
@@ -49,6 +50,55 @@ namespace SBM_CustomLevels.Extensions
             }
 
             return null;
+        }
+
+        public static void SetPropertyValue(object target, string propertyName, object value)
+        {
+            if (target == null)
+            {
+                throw new ArgumentNullException(nameof(target));
+            }
+
+            Type targetType = target.GetType();
+            PropertyInfo propertyInfo = targetType.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            if (propertyInfo == null)
+            {
+                throw new MissingMemberException(targetType.FullName, propertyName);
+            }
+
+            MethodInfo setMethod = propertyInfo.GetSetMethod(true);
+
+            if (setMethod == null)
+            {
+                throw new MissingMethodException(targetType.FullName, $"set_{propertyName}");
+            }
+
+            setMethod.Invoke(target, new object[] { value });
+        }
+
+        public static void SetStaticPropertyValue(Type targetType, string propertyName, object value)
+        {
+            if (targetType == null)
+            {
+                throw new ArgumentNullException(nameof(targetType));
+            }
+
+            PropertyInfo propertyInfo = targetType.GetProperty(propertyName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+
+            if (propertyInfo == null)
+            {
+                throw new MissingMemberException(targetType.FullName, propertyName);
+            }
+
+            MethodInfo setMethod = propertyInfo.GetSetMethod(true);
+
+            if (setMethod == null)
+            {
+                throw new MissingMethodException(targetType.FullName, $"set_{propertyName}");
+            }
+
+            setMethod.Invoke(null, new object[] { value });
         }
     }
 }
